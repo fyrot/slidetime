@@ -1,5 +1,5 @@
 export enum TimerCommand {
-
+  
 }
 
 export enum TimerType {
