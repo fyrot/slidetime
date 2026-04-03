@@ -1,0 +1,1 @@
+// we should have a class for identifying the regex pattern for a <<time>> or <<countdown>> from text

@@ -1,0 +1,130 @@
+import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
+
+// basically a universal source of truth for the other applications that should be accurate
+
+// move this interface to its own file
+interface SlidesSession {
+  port: chrome.runtime.Port // we open up a listener with each slides port
+  activeSlideInd: number,
+  timerStateRecord: Record<string, TimerState>
+}
+
+const MILLISECONDS_PER_SEC = 1000;
+
+const allSessions: Record<string, SlidesSession> = {};
+
+
+chrome.runtime.onConnect.addListener((port) => {
+    registerPort(port);
+})
+
+setInterval(() => {
+  updateTimerPos();
+}, MILLISECONDS_PER_SEC);
+
+// logic
+
+function registerPort(port: chrome.runtime.Port) {
+  const tabId = port.sender?.tab?.id;
+  if (tabId == null) { return; }
+  // non-null assertion
+
+  // include into session
+  allSessions[tabId] = {
+    port,
+    activeSlideInd: -1,
+    timerStateRecord: {}
+  };
+
+  // handle events and messaging from our tab
+  port.onMessage.addListener((msg: TimerMessaging) => {
+    handleMessage(tabId, msg); // port association lets us just receive the message, from timer-types
+  });
+
+  // clean-up when it gets popped
+  port.onDisconnect.addListener(() => {
+    delete allSessions[tabId]
+  });
+}
+
+function handleMessage(tabId: number, msg: TimerMessaging) {
+  const currentSession = allSessions[tabId];
+  if (currentSession == null) { return; }
+  // yet another non-null assertion
+
+  switch (msg.messageType) {
+    case TimerMessage.SLIDE_CHANGED:
+      handleSlideChanged(currentSession, msg.slideInd);
+      break;
+    case TimerMessage.REGISTER_TIMERS:
+      handleRegisterTimers(currentSession, msg.timers);
+      break;
+    case TimerMessage.GET_TIMER_STATES:
+      handleGetTimerStates(currentSession);
+      break;
+  }
+}
+
+
+function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
+  for (const timer of timers) {
+    // registering == reset
+    // what i'm thinking is that navigating to a slide can resume / register the timer (if new)
+    // exiting present mode and re-entering is what actually resets it
+
+    if (!session.timerStateRecord[timer.id]) {
+      // not registered yet
+
+      session.timerStateRecord[timer.id] = {
+        ...timer,
+        enabled: false,
+        elapsed: 0
+      };
+
+    }
+  }
+
+  verifyActiveTimers(session); 
+}
+
+function verifyActiveTimers(session: SlidesSession) {
+  // kind of unnecessary helper, just putting it here in case we want to do some other 
+  // logic checks that iterate through all of our active timers
+
+  for (const timer of Object.values(session.timerStateRecord)) {
+    timer.enabled = (timer.slideInd === session.activeSlideInd);
+  }
+}
+
+function handleSlideChanged(session: SlidesSession, newSlideInd: number) {
+  session.activeSlideInd = newSlideInd;
+  verifyActiveTimers(session);
+  
+}
+
+function handleGetTimerStates(session: SlidesSession) {
+
+  const retrieved: TimerStates = {
+    timers: Object.values(session.timerStateRecord)
+  };
+
+  session.port.postMessage(retrieved);
+
+  // return retrieved; 
+}
+
+function updateTimerPos() {
+  for (const session of Object.values(allSessions)) {
+    for (const timer of Object.values(session.timerStateRecord)) {
+      
+      if (timer.enabled) {
+        
+        if (timer.timerType === "countdown" && timer.elapsed < (timer.duration ?? 0)) {
+          // prob better to handle elapsed vs duration relationship here than in render
+          timer.elapsed++;
+        }
+
+      }
+    }
+  }
+}

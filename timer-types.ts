@@ -28,7 +28,7 @@ export interface TimerStates {
 
 export interface SlideChangedMessage {
   messageType: TimerMessage.SLIDE_CHANGED,
-  slideId: number // no need for self identification bc we'll be listening to the tab/presentation sending -- implicit param essentially
+  slideInd: number // no need for self identification bc we'll be listening to the tab/presentation sending -- implicit param essentially
 }
 
 export interface RegisterTimersMessage {
