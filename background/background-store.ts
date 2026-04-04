@@ -1,11 +1,13 @@
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
 
+// moved from root
+
 // basically a universal source of truth for the other applications that should be accurate
 
 // move this interface to its own file
 interface SlidesSession {
   port: chrome.runtime.Port // we open up a listener with each slides port
-  activeSlideInd: number,
+  activeSlideId: string,
   timerStateRecord: Record<string, TimerState>
 }
 
@@ -32,7 +34,7 @@ function registerPort(port: chrome.runtime.Port) {
   // include into session
   allSessions[tabId] = {
     port,
-    activeSlideInd: -1,
+    activeSlideId: "",
     timerStateRecord: {}
   };
 
@@ -54,13 +56,16 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
 
   switch (msg.messageType) {
     case TimerMessage.SLIDE_CHANGED:
-      handleSlideChanged(currentSession, msg.slideInd);
+      handleSlideChanged(currentSession, msg.slideId);
       break;
     case TimerMessage.REGISTER_TIMERS:
       handleRegisterTimers(currentSession, msg.timers);
       break;
     case TimerMessage.GET_TIMER_STATES:
       handleGetTimerStates(currentSession);
+      break;
+    case TimerMessage.RESET_SESSION:
+      handleResetSession(currentSession);
       break;
   }
 }
@@ -92,12 +97,12 @@ function verifyActiveTimers(session: SlidesSession) {
   // logic checks that iterate through all of our active timers
 
   for (const timer of Object.values(session.timerStateRecord)) {
-    timer.enabled = (timer.slideInd === session.activeSlideInd);
+    timer.enabled = (timer.slideId === session.activeSlideId);
   }
 }
 
-function handleSlideChanged(session: SlidesSession, newSlideInd: number) {
-  session.activeSlideInd = newSlideInd;
+function handleSlideChanged(session: SlidesSession, newSlideId: string) {
+  session.activeSlideId = newSlideId;
   verifyActiveTimers(session);
   
 }
@@ -111,6 +116,11 @@ function handleGetTimerStates(session: SlidesSession) {
   session.port.postMessage(retrieved);
 
   // return retrieved; 
+}
+
+function handleResetSession(session: SlidesSession) {
+  session.timerStateRecord = {};
+  session.activeSlideId = "";
 }
 
 function updateTimerPos() {

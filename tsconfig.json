@@ -14,6 +14,9 @@
         "./*"
       ]
     },
-    "baseUrl": "."
-  }
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0", // TODO: we'll refactor compiler options later
+    "types": ["chrome"]
+  },
+  
 }

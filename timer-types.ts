@@ -1,7 +1,8 @@
 export enum TimerMessage {
   SLIDE_CHANGED = "SLIDE_CHANGED",
   REGISTER_TIMERS = "REGISTER_TIMERS",
-  GET_TIMER_STATES = "GET_TIMER_STATES"
+  GET_TIMER_STATES = "GET_TIMER_STATES",
+  RESET_SESSION = "RESET_SESSION"
 }
 
 export type TimerType = "time" | "countdown"
@@ -9,7 +10,7 @@ export type TimerType = "time" | "countdown"
 export interface TimerData {
   id: string
   timerType: TimerType
-  slideInd: number
+  slideId: string // google presents the slide id in the url "hash"
 
   duration?: number
 }
@@ -28,7 +29,7 @@ export interface TimerStates {
 
 export interface SlideChangedMessage {
   messageType: TimerMessage.SLIDE_CHANGED,
-  slideInd: number // no need for self identification bc we'll be listening to the tab/presentation sending -- implicit param essentially
+  slideId: string // no need for self identification bc we'll be listening to the tab/presentation sending -- implicit param essentially
 }
 
 export interface RegisterTimersMessage {
@@ -40,7 +41,11 @@ export interface GetTimerStatesMessage {
   messageType: TimerMessage.GET_TIMER_STATES
 }
 
-export type TimerMessaging = SlideChangedMessage | RegisterTimersMessage | GetTimerStatesMessage
+export interface ResetSessionMessage {
+  messageType: TimerMessage.RESET_SESSION
+}
+
+export type TimerMessaging = SlideChangedMessage | RegisterTimersMessage | GetTimerStatesMessage | ResetSessionMessage
 
 
 
