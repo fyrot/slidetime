@@ -22,6 +22,7 @@ const PRESENT_MODE_QUERY = ".sketchyViewerContainer";
 let currentSlideId = "";
 let inPresentMode = false;
 let presentDocument: Document | null = null;
+let timerSyncInterval: number | null = null;
 
 const port = chrome.runtime.connect({ name: PORT_NAME });
 
@@ -30,8 +31,45 @@ port.onMessage.addListener((msg: TimerStates) => {
   renderTimerStates(msg);
 })
 
-setInterval(pollTimers, 1000);
-// idk if it's better practice to have 1000 be MILLISECONDS_PER_SEC
+// watch for presentation mode without 1s checking thing
+const mainObserver = new MutationObserver(() => {
+  const currentlyPresenting = isInPresentMode();
+
+  if (currentlyPresenting && !inPresentMode) {
+    // if we just entered present mode
+    inPresentMode = true;
+    currentSlideId = "";
+
+    // interval for only when in present mode
+    if (!timerSyncInterval) {
+      timerSyncInterval = setInterval(syncTimers, 1000);
+    }
+  } 
+  else if (!currentlyPresenting && inPresentMode) {
+    // reset logic if we just exited present mode
+    inPresentMode = false;
+    currentSlideId = "";
+
+    // clear stale element references so re-entering present mode rescans
+    for (const key of Object.keys(timerElmRecord)) {
+      delete timerElmRecord[key];
+    }
+    
+    const messageContent: TimerMessaging = {
+      messageType: TimerMessage.RESET_SESSION
+    };
+    port.postMessage(messageContent);
+    
+    // stop interval since we're not presenting
+    if (timerSyncInterval) {
+      clearInterval(timerSyncInterval);
+      timerSyncInterval = null;
+    }
+  }
+});
+
+// observse whole document for changes (not sure if this is necessary, not sure where you check for if we enter)
+mainObserver.observe(document.body, { childList: true, subtree: true });
 
 function getCurrentSlideId(): string {
   const fullHash = window.location.href;
@@ -122,35 +160,9 @@ function isInPresentMode(): boolean {
   return getPresentDocument() !== null;
 }
 
-function pollTimers() {
-  //console.log(`GFN timer poll — url: ${window.location.href} — present mode: ${isInPresentMode()}`);
-  
-  if (!isInPresentMode()) {
-    if (inPresentMode) {
-      // reset logic if we just exited present mode
-      inPresentMode = false;
-      currentSlideId = "";
-      // clear stale element references so re-entering present mode rescans
-      for (const key of Object.keys(timerElmRecord)) {
-        delete timerElmRecord[key];
-      }
-      
-      const messageContent: TimerMessaging = {
-        messageType: TimerMessage.RESET_SESSION
-      }
-      port.postMessage(messageContent)
-      
-    }
-
-    //console.log("GFN: not in present mode, skipping");
-    return;
-  }
-
-  if (!inPresentMode) {
-    inPresentMode = true;
-  }
-
-  //console.log("GFN reached present mode");
+function syncTimers() {
+  // run every second while in present mode
+  if (!inPresentMode) return;
 
   const id = getCurrentSlideId();
   if (id !== currentSlideId) {
