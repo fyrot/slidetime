@@ -23,6 +23,21 @@ let currentSlideId = "";
 let inPresentMode = false;
 let presentDocument: Document | null = null;
 let timerSyncInterval: number | null = null;
+let currentOptions: Record<string, boolean> = {};
+
+// Load options initially
+chrome.storage.local.get(["timerOptionStates"], (result) => {
+  if (result.timerOptionStates) {
+    currentOptions = result.timerOptionStates;
+  }
+});
+
+// Listen for options changes dynamically
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === "local" && changes.timerOptionStates) {
+    currentOptions = changes.timerOptionStates.newValue;
+  }
+});
 
 const port = chrome.runtime.connect({ name: PORT_NAME });
 
@@ -178,6 +193,6 @@ function renderTimerStates(timerStates: TimerStates) {
     const nodeRef = timerElmRecord[timerState.id];
     if (!nodeRef) { continue; }
 
-    nodeRef.textContent = formatTimer(timerState);
+    nodeRef.textContent = formatTimer(timerState, currentOptions);
   }
 }

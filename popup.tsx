@@ -66,30 +66,21 @@ function IndexPopup() {
   const [isLoading, setIsLoading] = useState(true)
   const [options, setOptions] = useState<TimerOption[]>([
     {
-      id: "autoStart",
-      label: "Auto-Start Timer",
-      description: "Automatically start timer on match found",
-      enabled: true
-    },
-    {
-      id: "notifications",
-      label: "Show Notifications",
-      description: "Get alerts when timer finishes",
+      id: "24hr",
+      label: "24 Hour Time Format",
+      description: "Display time in 24-hour format",
       enabled: false
     },
-    {
-      id: "sound",
-      label: "Play Sound",
-      description: "Play an audible beep when timer is up",
-      enabled: true
-    }
   ])
 
   // Load options from Chrome Storage when pop up opens
   useEffect(() => {
-    chrome.storage.local.get(["timerOptions"], function (result) {
-      if (result.timerOptions) {
-        setOptions(result.timerOptions)
+    chrome.storage.local.get(["timerOptionStates"], function (result) {
+      if (result.timerOptionStates) {
+        setOptions(prevOptions => prevOptions.map(opt => ({
+          ...opt,
+          enabled: result.timerOptionStates[opt.id] ?? opt.enabled
+        })))
       }
       setIsLoading(false)
     })
@@ -105,8 +96,14 @@ function IndexPopup() {
     })
     
     setOptions(updatedOptions)
-    // Save to Chrome Storage
-    chrome.storage.local.set({ timerOptions: updatedOptions })
+    
+    // Save to Chrome Storage as an object mapping
+    const statesToSave = updatedOptions.reduce((acc, opt) => {
+      acc[opt.id] = opt.enabled
+      return acc
+    }, {} as Record<string, boolean>)
+
+    chrome.storage.local.set({ timerOptionStates: statesToSave })
   }
 
   // Render option card
@@ -153,12 +150,12 @@ function IndexPopup() {
             <span className="flex-1 border-b border-[#732f2f]/50 ml-2"></span>
           </h3>
           <div className="space-y-2">
-            <CommandReferenceCard command="<<shortdate>>">
-              Current date in <span className="font-semibold text-white">DD-MM-YYYY</span> format
+            <CommandReferenceCard command="<<countdown:mm:ss>>">
+              Command to start a countdown timer from <span className="font-semibold text-white">mm:ss</span>
             </CommandReferenceCard>
             
-            <CommandReferenceCard command="<<x:xx+>>">
-              Command to start a stopwatch timing up from <span className="font-semibold text-white">x:xx</span>
+            <CommandReferenceCard command="<<time>>">
+              Command to display the current time in <span className="font-semibold text-white">hh:mm:ss</span> format
             </CommandReferenceCard>
           </div>
         </div>
