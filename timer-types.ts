@@ -5,7 +5,7 @@ export enum TimerMessage {
   RESET_SESSION = "RESET_SESSION"
 }
 
-export type TimerType = "time" | "countdown"
+export type TimerType = "time" | "countdown" | "stopwatch" | "date" | "shortdate" | "longdate"
 
 export interface TimerData {
   id: string

@@ -10,6 +10,14 @@ export function formatTimer(timerState: TimerState, options: Record<string, bool
       return formatTime(options);
     case "countdown":
       return formatCountdown(timerState);
+    case "stopwatch":
+      return formatStopwatch(timerState);
+    case "date":
+      return formatDate();
+    case "shortdate":
+      return formatDate("shortdate");
+    case "longdate":
+      return formatDate("longdate");
   }
 }
 
@@ -17,21 +25,7 @@ export function formatTime(options: Record<string, boolean> = {}):string {
   const is24Hr = options["24hr"] ?? false; // should exist but just in case
   const currentDate = new Date();
   
-  let hours = currentDate.getHours();
-  
-  let period = "";
-  if (!is24Hr) {
-    period = hours >= 12 ? " PM" : " AM";
-    hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
-  }
-  
-  const hh = padTwoZeros(hours);
-  const mm = padTwoZeros(currentDate.getMinutes());
-  const ss = padTwoZeros(currentDate.getSeconds());
-  
-  const formatString = `${hh}:${mm}:${ss}${period}`;
-  return formatString;
+  return currentDate.toLocaleTimeString([], { hour12: !is24Hr });
 }
 
 export function formatCountdown(timerState: TimerState):string {
@@ -40,10 +34,25 @@ export function formatCountdown(timerState: TimerState):string {
   const remaining = Math.max(remainingRaw, 0);
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
-  const mm = padTwoZeros(minutes);
   const ss = padTwoZeros(seconds);
-  const formatString =  `${mm}:${ss}`  
+  const formatString =  `${minutes}:${ss}`  
   return formatString;
+}
+
+export function formatStopwatch(timerState: TimerState):string {
+  // duration acts as the starting point
+  const totalRaw = (timerState.duration ?? 0) + timerState.elapsed;
+  const minutes = Math.floor(totalRaw / 60);
+  const seconds = totalRaw % 60;
+  return `${minutes}:${padTwoZeros(seconds)}`;
+}
+
+export function formatDate(type: "date" | "shortdate" | "longdate" = "date"):string {
+  const currentDate = new Date();
+  if (type === "date") return currentDate.toLocaleDateString(); // 4/4/2026
+  else if (type === "shortdate") return currentDate.toLocaleDateString([], { weekday : "short", month: "short", day: "numeric", year: "numeric" }); // Sat, Apr 4, 2026
+  else if (type === "longdate") return currentDate.toLocaleDateString([], { weekday : "long", month: "long", day: "numeric", year: "numeric" }); // Saturday, April 4, 2026
+  else return currentDate.toLocaleDateString(); // 4/4/2026, but this DEFINITELY shouldn't happen
 }
 
 // helper functions below

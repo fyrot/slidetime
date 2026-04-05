@@ -5,10 +5,7 @@ import type { TimerData, TimerType } from "~timer-types";
 // we can expand it to be more robust/flexible later
 // ex: only check for the beginning "time", "countdown" etc. in the string, conditionally check the rest for flags
 
-const TIMER_REGEX = /^<<(time|countdown)(?::(\d{2}):(\d{2}))?>>$/
-// /^<<(time|countdown:(\d{2}):(\d{2}))>>$/; <- old reg-ex, new one is more flexible
-// matches[1] = timer type, after that are optional(?) parameters
-
+const TIMER_REGEX = /^<<(?:(time|date|shortdate|longdate)|(\d+):(\d{2})([+-]))>>$/
 
 export interface ParsedTimerToken {
   timerType: TimerType
@@ -19,14 +16,30 @@ export function parseTimerToken(tokenTxt: string) {
   const matches = tokenTxt.trim().match(TIMER_REGEX);
   if (!matches) { return null; }
 
-  switch (matches[1]) {
-    case "time":
-      return parseTokenTime(matches);
-    case "countdown":
-      return parseTokenCountdown(matches);
-    default:
-      return null;
+  // i asked copilot if there were any errors in what i added and it wanted me to split it into the two seperate if statements isntead of just checking
+  // one by one like if (matches[4] === "+") and if (matches[1] === "time") etc. im not too sure why but it works
+  if (matches[1]) {
+    switch (matches[1]) {
+      case "time":
+        return parseTokenTime();
+      case "date":
+        return parseTokenDate(matches);
+      case "shortdate":
+        return parseTokenDate(matches, "shortdate");
+      case "longdate":
+        return parseTokenDate(matches, "longdate");
+    }
   }
+  else if (matches[4]) {
+    if (matches[4] === "+") {
+      return parseTokenStopwatch(matches);
+    } 
+    else if (matches[4] === "-") {
+      return parseTokenCountdown(matches);
+    }
+  }
+
+  return null;
 }
 
 export function buildTimerData(timerToken: ParsedTimerToken, tokenInd: number, slideId: string):TimerData {
@@ -42,7 +55,7 @@ export function buildTimerData(timerToken: ParsedTimerToken, tokenInd: number, s
 }
 
 // helper functions for parseToken
-function parseTokenTime(matches: RegExpMatchArray) {
+function parseTokenTime() {
   const timerObj: ParsedTimerToken = {
     timerType: "time"
   }
@@ -51,7 +64,7 @@ function parseTokenTime(matches: RegExpMatchArray) {
 }
 
 function parseTokenCountdown(matches: RegExpMatchArray) {
-  const minutes = parseInt(matches[2] ?? "0"); // defaults to 00:00 if not provided
+  const minutes = parseInt(matches[2] ?? "0"); // defaults to 0 if not provided
   const seconds = parseInt(matches[3] ?? "0");
 
   const totalSeconds = minutes * 60 + seconds;
@@ -60,6 +73,28 @@ function parseTokenCountdown(matches: RegExpMatchArray) {
     timerType: "countdown",
     duration: totalSeconds
   };
+
+  return timerObj;
+}
+
+function parseTokenStopwatch(matches: RegExpMatchArray) {
+  const minutes = parseInt(matches[2] ?? "0"); // defaults to 0 if not provided
+  const seconds = parseInt(matches[3] ?? "0");
+
+  const totalSeconds = minutes * 60 + seconds;
+
+  const timerObj: ParsedTimerToken = {
+    timerType: "stopwatch",
+    duration: totalSeconds
+  };
+
+  return timerObj;
+}
+
+function parseTokenDate(matches: RegExpMatchArray, type: string = "date") {
+  const timerObj: ParsedTimerToken = {
+    timerType: type as TimerType
+  }
 
   return timerObj;
 }

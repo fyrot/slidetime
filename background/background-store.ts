@@ -132,6 +132,9 @@ function updateTimerPos() {
         if (timer.timerType === "countdown" && timer.elapsed < (timer.duration ?? 0)) {
           // prob better to handle elapsed vs duration relationship here than in render
           timer.elapsed++;
+        } 
+        else if (timer.timerType === "stopwatch") {
+          timer.elapsed++;
         }
 
       }

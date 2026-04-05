@@ -150,12 +150,28 @@ function IndexPopup() {
             <span className="flex-1 border-b border-[#732f2f]/50 ml-2"></span>
           </h3>
           <div className="space-y-2">
-            <CommandReferenceCard command="<<countdown:mm:ss>>">
+            <CommandReferenceCard command="<<mm:ss->>">
               Command to start a countdown timer from <span className="font-semibold text-white">mm:ss</span>
+            </CommandReferenceCard>
+
+            <CommandReferenceCard command="<<mm:ss+>>">
+              Command to start a stopwatch counting up from <span className="font-semibold text-white">mm:ss</span>
             </CommandReferenceCard>
             
             <CommandReferenceCard command="<<time>>">
               Command to display the current time in <span className="font-semibold text-white">hh:mm:ss</span> format
+            </CommandReferenceCard>
+
+            <CommandReferenceCard command="<<date>>">
+              Command to display the current date <span className="font-semibold text-white">(MM/DD/YYYY)</span>
+            </CommandReferenceCard>
+
+            <CommandReferenceCard command="<<shortdate>>">
+              Command to display a short date format <span className="font-semibold text-white">(e.g. Sat, Apr 4, 2026)</span>
+            </CommandReferenceCard>
+
+            <CommandReferenceCard command="<<longdate>>">
+              Command to display a long date format <span className="font-semibold text-white">(e.g. Saturday, April 4, 2026)</span>
             </CommandReferenceCard>
           </div>
         </div>
