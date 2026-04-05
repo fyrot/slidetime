@@ -173,6 +173,10 @@ function IndexPopup() {
             <CommandReferenceCard command="<<longdate>>">
               Command to display a long date format <span className="font-semibold text-white">(e.g. Saturday, April 4, 2026)</span>
             </CommandReferenceCard>
+
+            <CommandReferenceCard command="<<timetoHH:MM>>">
+              Command to start a countdown to the next occurrence of the specified time <span className="font-semibold text-white">(e.g. {'<<timeto2:00>>'})</span>
+            </CommandReferenceCard>
           </div>
         </div>
       </div>
