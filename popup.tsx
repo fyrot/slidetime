@@ -64,6 +64,7 @@ function CommandReferenceCard(props: { command: string; children: React.ReactNod
 // Main popup component
 function IndexPopup() {
   const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<"settings" | "reference">("reference")
   const [options, setOptions] = useState<TimerOption[]>([
     {
       id: "24hr",
@@ -120,7 +121,7 @@ function IndexPopup() {
   return (
     <div className="w-[325px] h-[425px] flex flex-col bg-gradient-to-br from-[#500000] to-[#3c001c] text-[#f6f6f6] font-sans p-5 shadow-2xl">
       {/* Header */}
-      <div className="border-b border-[#732f2f]/50 pb-4 mb-5">
+      <div className="pb-3 mb-3 border-b border-[#732f2f]/50">
         <h1 className="text-2xl font-black text-center tracking-wider drop-shadow-md">
           <span className="text-[#a7a7a7] opacity-80">G</span>F<span className="text-[#a7a7a7] opacity-80">N</span> Timer
         </h1>
@@ -129,28 +130,50 @@ function IndexPopup() {
         </p>
       </div>
 
-      {/* Options List and Commands Reference */}
-      <div className="flex-1 overflow-y-auto space-y-5 pr-1 pb-2 custom-scrollbar">
-        {/* Options */}
-        <div className="space-y-3.5">
-          {isLoading ? (
-            <div className="flex bg-[#3c001c]/80 backdrop-blur-sm p-3.5 rounded-xl items-center justify-center border border-[#732f2f]/60 h-24 opacity-50">
-              <span className="text-sm font-bold text-[#d1d1d1] animate-pulse">Loading settings...</span>
-            </div>
-          ) : (
-            options.map((renderOption))
-          )}
-        </div>
+      {/* Tabs */}
+      <div className="flex border-b border-[#732f2f]/50 mb-4">
+        <button
+          onClick={() => setActiveTab("reference")}
+          className={`flex-1 pb-2 text-sm font-bold text-center transition-colors duration-200 outline-none ${
+            activeTab === "reference"
+              ? "text-[#f6f6f6] border-b-2 border-[#f6f6f6]"
+              : "text-[#a7a7a7] hover:text-[#d1d1d1]"
+          }`}
+        >
+          Reference
+        </button>
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`flex-1 pb-2 text-sm font-bold text-center transition-colors duration-200 outline-none ${
+            activeTab === "settings"
+              ? "text-[#f6f6f6] border-b-2 border-[#f6f6f6]"
+              : "text-[#a7a7a7] hover:text-[#d1d1d1]"
+          }`}
+        >
+          Settings
+        </button>
+      </div>
 
-        {/* Commands Reference */}
-        <div>
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-[#a7a7a7] mb-2.5 px-1 flex items-center">
-            <span className="flex-1 border-b border-[#732f2f]/50 mr-2"></span>
-            Command Reference
-            <span className="flex-1 border-b border-[#732f2f]/50 ml-2"></span>
-          </h3>
-          <div className="space-y-2">
-            <CommandReferenceCard command="<<mm:ss->>">
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto space-y-5 pr-1 pb-2 custom-scrollbar">
+        {/* Settings Tab */}
+        {activeTab === "settings" && (
+          <div className="space-y-3.5">
+            {isLoading ? (
+              <div className="flex bg-[#3c001c]/80 backdrop-blur-sm p-3.5 rounded-xl items-center justify-center border border-[#732f2f]/60 h-24 opacity-50">
+                <span className="text-sm font-bold text-[#d1d1d1] animate-pulse">Loading settings...</span>
+              </div>
+            ) : (
+              options.map(renderOption)
+            )}
+          </div>
+        )}
+
+        {/* Reference Tab */}
+        {activeTab === "reference" && (
+          <div>
+            <div className="space-y-2">
+              <CommandReferenceCard command="<<mm:ss->>">
               Command to start a countdown timer from <span className="font-semibold text-white">mm:ss</span>
             </CommandReferenceCard>
 
@@ -179,6 +202,7 @@ function IndexPopup() {
             </CommandReferenceCard>
           </div>
         </div>
+        )}
       </div>
 
       {/* Footer */}
