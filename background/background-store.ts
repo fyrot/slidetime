@@ -29,23 +29,23 @@ setInterval(() => {
 function registerPort(port: chrome.runtime.Port) {
   const tabId = port.sender?.tab?.id;
   if (tabId == null) { return; }
-  // non-null assertion
 
-  // include into session
-  allSessions[tabId] = {
-    port,
-    activeSlideId: "",
-    timerStateRecord: {}
-  };
+  if (allSessions[tabId]) {
+    allSessions[tabId].port = port;
+  } else {
+    allSessions[tabId] = {
+      port,
+      activeSlideId: "",
+      timerStateRecord: {}
+    };
+  }
 
-  // handle events and messaging from our tab
   port.onMessage.addListener((msg: TimerMessaging) => {
-    handleMessage(tabId, msg); // port association lets us just receive the message, from timer-types
+    handleMessage(tabId, msg);
   });
 
-  // clean-up when it gets popped
   port.onDisconnect.addListener(() => {
-    delete allSessions[tabId]
+    delete allSessions[tabId];
   });
 }
 
@@ -73,23 +73,15 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
 
 function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
   for (const timer of timers) {
-    // registering == reset
-    // what i'm thinking is that navigating to a slide can resume / register the timer (if new)
-    // exiting present mode and re-entering is what actually resets it
-
     if (!session.timerStateRecord[timer.id]) {
-      // not registered yet
-
       session.timerStateRecord[timer.id] = {
         ...timer,
         enabled: false,
         elapsed: 0
       };
-
     }
   }
-
-  verifyActiveTimers(session); 
+  verifyActiveTimers(session);
 }
 
 function verifyActiveTimers(session: SlidesSession) {
@@ -108,14 +100,10 @@ function handleSlideChanged(session: SlidesSession, newSlideId: string) {
 }
 
 function handleGetTimerStates(session: SlidesSession) {
-
   const retrieved: TimerStates = {
     timers: Object.values(session.timerStateRecord)
   };
-
   session.port.postMessage(retrieved);
-
-  // return retrieved; 
 }
 
 function handleResetSession(session: SlidesSession) {

@@ -11,6 +11,7 @@ import { TimerMessage, type TimerData, type TimerMessaging, type TimerStates } f
 // TODO: move from polling per second via setinterval and move to event based mutationobserver approach
 
 // for selecting text nodes from rendered slide
+
 const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
 
 const timerElmRecord: Record<string, SVGTextElement> = {};
@@ -18,6 +19,8 @@ const timerElmRecord: Record<string, SVGTextElement> = {};
 const PORT_NAME = "gfn-timer";
 const SLIDE_ID_REGEX = /slide=([^&]+)/;
 const PRESENT_MODE_QUERY = ".sketchyViewerContainer";
+const PRESENT_MODE_CONTAINER = ".punch-full-screen-element";
+const SLIDE_WRAPPER_QUERY = ".punch-viewer-page-wrapper"; // keeping for potential future use
 
 let currentSlideId = "";
 let inPresentMode = false;
@@ -46,45 +49,62 @@ port.onMessage.addListener((msg: TimerStates) => {
   renderTimerStates(msg);
 })
 
-// watch for presentation mode without 1s checking thing
-const mainObserver = new MutationObserver(() => {
+
+// we're going with a two-tiered approach, observer for present mode detection and 
+// a poll for render updates / slide change detection
+// --> outer observed is determined by .punch-full-screen-element appear in immediate dom body
+const outerObserver = new MutationObserver(() => {
   const currentlyPresenting = isInPresentMode();
 
   if (currentlyPresenting && !inPresentMode) {
-    // if we just entered present mode
-    inPresentMode = true;
-    currentSlideId = "";
-
-    // interval for only when in present mode
-    if (!timerSyncInterval) {
-      timerSyncInterval = setInterval(syncTimers, 1000);
-    }
-  } 
+    enterPresentMode();
+  }
   else if (!currentlyPresenting && inPresentMode) {
-    // reset logic if we just exited present mode
-    inPresentMode = false;
-    currentSlideId = "";
-
-    // clear stale element references so re-entering present mode rescans
-    for (const key of Object.keys(timerElmRecord)) {
-      delete timerElmRecord[key];
-    }
-    
-    const messageContent: TimerMessaging = {
-      messageType: TimerMessage.RESET_SESSION
-    };
-    port.postMessage(messageContent);
-    
-    // stop interval since we're not presenting
-    if (timerSyncInterval) {
-      clearInterval(timerSyncInterval);
-      timerSyncInterval = null;
-    }
+    exitPresentMode();
   }
 });
 
-// observse whole document for changes (not sure if this is necessary, not sure where you check for if we enter)
-mainObserver.observe(document.body, { childList: true, subtree: true });
+// we can scope to simply the immediate childlist, .punch-full-screen-element is a direct child
+outerObserver.observe(document.body, { childList: true });
+
+function enterPresentMode() {
+  inPresentMode = true;
+  currentSlideId = "";
+  
+  // the background timer is to handle cases where google slides' internal rendering structure changes
+  // checks for slide changes + timer state sync 
+
+  // TODO: timer state should be mapped to dates rather than interval increments, subject to drift currently
+  if (!timerSyncInterval) {
+    timerSyncInterval = setInterval(syncTimers, 1000);
+  }
+
+}
+
+function exitPresentMode() {
+  inPresentMode = false;
+  currentSlideId = "";
+  
+  
+  // clear stale element and document references so re-entering present mode rescans
+  for (const key of Object.keys(timerElmRecord)) {
+    delete timerElmRecord[key];
+  }
+  presentDocument = null; // this was why we were getting stale reference errors again
+
+
+  const messageContent: TimerMessaging = {
+    messageType: TimerMessage.RESET_SESSION
+  };
+  port.postMessage(messageContent);
+
+  // clear poll interval since we're not presenting anymore again
+
+  if (timerSyncInterval) {
+    clearInterval(timerSyncInterval);
+    timerSyncInterval = null;
+  }
+}
 
 function getCurrentSlideId(): string {
   const fullHash = window.location.href;
@@ -172,7 +192,7 @@ function getPresentDocument(): Document | null {
 }
 
 function isInPresentMode(): boolean {
-  return getPresentDocument() !== null;
+  return document.querySelector(PRESENT_MODE_CONTAINER) !== null;
 }
 
 function syncTimers() {
