@@ -9,6 +9,9 @@ console.log("GFN Timer: content script injected");
 const SLIDE_CHANGED_INTERVAL = 100; // 0.1s
 const STATE_SYNC_INTERVAL = 5000;
 
+const INITIAL_RETRIES = 10;
+let extractRetries = 0;
+
 // for selecting text nodes from rendered slide
 
 const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
@@ -48,13 +51,25 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-const port = chrome.runtime.connect({ name: PORT_NAME });
+let port = makePort();
 
-// render loop now acts on cached timer states
-port.onMessage.addListener((msg: TimerStates) => {
-  //console.log("GFN Timer: cached", msg.timers.length, "timers from BG");
-  cachedTimerStates = msg;
-})
+function makePort() {
+  const newPort = chrome.runtime.connect({ name: PORT_NAME });
+  
+  // auto reconnect
+  newPort.onDisconnect.addListener(() => {
+    port = makePort();
+  })
+
+  // render loop now acts on cached timer states
+  newPort.onMessage.addListener((msg: TimerStates) => {
+    //console.log("GFN Timer: cached", msg.timers.length, "timers from BG");
+    cachedTimerStates = msg;
+  });
+
+  return newPort;
+
+}
 
 
 // we're going with a two-tiered approach, observer for present mode detection and 
@@ -78,21 +93,25 @@ function enterPresentMode() {
   console.log("GFN Timer: enterPresentMode");
   inPresentMode = true;
   currentSlideId = "";
-
-  setTimeout(() => {}, 1000);
+  extractRetries = 0;
 
   // slide change detection, operates on a faster interval for "responsiveness"
   if (!slideCheckInterval) {
     checkSlideChange(); // run immediately on enter
-    slideCheckInterval = setInterval(checkSlideChange, SLIDE_CHANGED_INTERVAL);
+    setTimeout(() => {
+      slideCheckInterval = setInterval(() => {checkSlideChange();}, SLIDE_CHANGED_INTERVAL);
+    }, 500);
+    
   }
-
   // slower interval state sync to refresh cached states from background store
   // -> also serves as a heartbeat to keep the service worker alive
   if (!stateSyncInterval) {
     getTimerStates();
     stateSyncInterval = setInterval(getTimerStates, STATE_SYNC_INTERVAL);
   }
+
+   
+
 
   // render loop, runs every frame and does local calculations
   if (!renderLoopId) {
@@ -195,7 +214,7 @@ function onSlideChanged(): boolean {
   // we'll go with polling for this; in case google engineers change how the dom renders slides
   //  this is a more robust, stable method that will likely require less dev intervention
   const slideId = getCurrentSlideId();
-
+  const extracted = extractFromCurrentSlide();
   const messageContent:TimerMessaging = {
     messageType: TimerMessage.SLIDE_CHANGED,
     slideId: slideId
@@ -203,7 +222,7 @@ function onSlideChanged(): boolean {
 
   port.postMessage(messageContent);
 
-  return extractFromCurrentSlide();
+  return extracted;
 }
 
 function getTimerStates() {
@@ -246,11 +265,22 @@ function checkSlideChange() {
   const id = getCurrentSlideId();
   if (id !== currentSlideId) {
     //console.log("GFN Timer: slide changed from", currentSlideId, "to", id);
-    if (!getPresentDocument()) { return; }
-    console.log("GFN Timer: slide changed, doc present");
-    currentSlideId = id;
-    onSlideChanged();
-    getTimerStates();
+    const doc = getPresentDocument();
+    if (!doc) { return; }
+
+    console.log("trying..")
+    if (onSlideChanged()) {
+      console.log("onslidechanged hit");
+      currentSlideId = id;
+      extractRetries = 0;
+      getTimerStates();
+    } else if (extractRetries++ > INITIAL_RETRIES) {
+      console.log("extract retry limit hit");
+      currentSlideId = id;
+      extractRetries = 0;
+      getTimerStates();
+    }
+    
   }
 }
 
