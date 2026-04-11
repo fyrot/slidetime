@@ -2,7 +2,8 @@ export enum TimerMessage {
   SLIDE_CHANGED = "SLIDE_CHANGED",
   REGISTER_TIMERS = "REGISTER_TIMERS",
   GET_TIMER_STATES = "GET_TIMER_STATES",
-  RESET_SESSION = "RESET_SESSION"
+  RESET_SESSION = "RESET_SESSION",
+  HEART_BEAT = "HEART_BEAT"
 }
 
 export type TimerType = "time" | "countdown" | "stopwatch" | "date" | "shortdate" | "longdate"
@@ -17,7 +18,8 @@ export interface TimerData {
 
 export interface TimerState extends TimerData {
   enabled: boolean
-  elapsed: number
+  startedAt: number | null
+  accumulatedMs: number
 }
 
 export interface TimerStates {
@@ -45,9 +47,19 @@ export interface ResetSessionMessage {
   messageType: TimerMessage.RESET_SESSION
 }
 
-export type TimerMessaging = SlideChangedMessage | RegisterTimersMessage | GetTimerStatesMessage | ResetSessionMessage
+// unnecessary definition for now in case we wanna use later, state syncs act as de facto heartbeat currently
+export interface HeartbeatMessage {
+  messageType: TimerMessage.HEART_BEAT
+}
 
+export type TimerMessaging = 
+  | SlideChangedMessage 
+  | RegisterTimersMessage 
+  | GetTimerStatesMessage 
+  | ResetSessionMessage 
+  | HeartbeatMessage
 
+// union ^ pretty sure that's what that's called
 
 
 

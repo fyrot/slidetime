@@ -1,8 +1,7 @@
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
 
-// moved from root
-
 // basically a universal source of truth for the other applications that should be accurate
+// NEW: now does not update elapsed time, rather acts as a db for the content scripts
 
 // move this interface to its own file
 interface SlidesSession {
@@ -11,18 +10,11 @@ interface SlidesSession {
   timerStateRecord: Record<string, TimerState>
 }
 
-const MILLISECONDS_PER_SEC = 1000;
-
 const allSessions: Record<string, SlidesSession> = {};
-
 
 chrome.runtime.onConnect.addListener((port) => {
     registerPort(port);
-})
-
-setInterval(() => {
-  updateTimerPos();
-}, MILLISECONDS_PER_SEC);
+});
 
 // logic
 
@@ -72,31 +64,46 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
 
 
 function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
+  console.log("-- (Registering) --");
   for (const timer of timers) {
     if (!session.timerStateRecord[timer.id]) {
       session.timerStateRecord[timer.id] = {
         ...timer,
         enabled: false,
-        elapsed: 0
+        startedAt: null,
+        accumulatedMs: 0
       };
+      console.log("Registered new timer");
     }
   }
+  console.log("-- (Registered) -- ");
   verifyActiveTimers(session);
 }
 
 function verifyActiveTimers(session: SlidesSession) {
-  // kind of unnecessary helper, just putting it here in case we want to do some other 
-  // logic checks that iterate through all of our active timers
-
   for (const timer of Object.values(session.timerStateRecord)) {
-    timer.enabled = (timer.slideId === session.activeSlideId);
+    
+    const shouldBeEnabled = (timer.slideId === session.activeSlideId);
+    // detecting incongruity between shouldbeenabled and what is stored for determine logic
+    if (shouldBeEnabled && !timer.enabled) {
+      // resuming -> start the clock (again?)
+      timer.startedAt = Date.now();
+    } else if (!shouldBeEnabled && timer.enabled) {
+      // pausing -> bank the elapsed time, reset startedAt
+      if (timer.startedAt) {
+        timer.accumulatedMs += Date.now() - timer.startedAt;
+        timer.startedAt = null;
+      }
+    }
+
+    timer.enabled = shouldBeEnabled;
   }
 }
 
 function handleSlideChanged(session: SlidesSession, newSlideId: string) {
   session.activeSlideId = newSlideId;
   verifyActiveTimers(session);
-  
+  console.log("Slide changed");
 }
 
 function handleGetTimerStates(session: SlidesSession) {
@@ -111,21 +118,3 @@ function handleResetSession(session: SlidesSession) {
   session.activeSlideId = "";
 }
 
-function updateTimerPos() {
-  for (const session of Object.values(allSessions)) {
-    for (const timer of Object.values(session.timerStateRecord)) {
-      
-      if (timer.enabled) {
-        
-        if (timer.timerType === "countdown" && timer.elapsed < (timer.duration ?? 0)) {
-          // prob better to handle elapsed vs duration relationship here than in render
-          timer.elapsed++;
-        } 
-        else if (timer.timerType === "stopwatch") {
-          timer.elapsed++;
-        }
-
-      }
-    }
-  }
-}

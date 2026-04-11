@@ -3,12 +3,7 @@ import type { PlasmoCSConfig } from "plasmo";
 import { buildTimerData, parseTimerToken } from "~parse-timers";
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerStates } from "~timer-types";
 
-// moved from root again
-
-// TODO: i remember hearing that setinterval can drift, so we can look at that after the text replacement at least works
-// would likely need to be most corrected in the background store
-
-// TODO: move from polling per second via setinterval and move to event based mutationobserver approach
+console.log("GFN Timer: content script injected");
 
 // for selecting text nodes from rendered slide
 
@@ -25,7 +20,14 @@ const SLIDE_WRAPPER_QUERY = ".punch-viewer-page-wrapper"; // keeping for potenti
 let currentSlideId = "";
 let inPresentMode = false;
 let presentDocument: Document | null = null;
-let timerSyncInterval: number | null = null;
+
+// moving to content scripts acting on caches from the background store 
+let slideCheckInterval: number | null = null;
+let stateSyncInterval: number | null = null;
+let renderLoopId: number | null = null;
+let cachedTimerStates: TimerStates | null = null;
+
+
 let currentOptions: Record<string, boolean> = {};
 
 // Load options initially
@@ -44,9 +46,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 const port = chrome.runtime.connect({ name: PORT_NAME });
 
-// render cycle
+// render loop now acts on cached timer states
 port.onMessage.addListener((msg: TimerStates) => {
-  renderTimerStates(msg);
+  //console.log("GFN Timer: cached", msg.timers.length, "timers from BG");
+  cachedTimerStates = msg;
 })
 
 
@@ -68,41 +71,64 @@ const outerObserver = new MutationObserver(() => {
 outerObserver.observe(document.body, { childList: true });
 
 function enterPresentMode() {
+  console.log("GFN Timer: enterPresentMode");
   inPresentMode = true;
   currentSlideId = "";
-  
-  // the background timer is to handle cases where google slides' internal rendering structure changes
-  // checks for slide changes + timer state sync 
 
-  // TODO: timer state should be mapped to dates rather than interval increments, subject to drift currently
-  if (!timerSyncInterval) {
-    timerSyncInterval = setInterval(syncTimers, 1000);
+  // slide change detection, operates on a faster interval for "responsiveness"
+  if (!slideCheckInterval) {
+    checkSlideChange(); // run immediately on enter
+    slideCheckInterval = setInterval(checkSlideChange, 1000);
   }
 
+  // slower interval state sync to refresh cached states from background store
+  // -> also serves as a heartbeat to keep the service worker alive
+  if (!stateSyncInterval) {
+    getTimerStates();
+    stateSyncInterval = setInterval(getTimerStates, 5000);
+  }
+
+  // render loop, runs every frame and does local calculations
+  if (!renderLoopId) {
+    renderLoopId = requestAnimationFrame(renderLoop);
+  }
 }
 
 function exitPresentMode() {
   inPresentMode = false;
   currentSlideId = "";
-  
-  
+
+  // reset cached states
+  cachedTimerStates = null;
+
   // clear stale element and document references so re-entering present mode rescans
   for (const key of Object.keys(timerElmRecord)) {
     delete timerElmRecord[key];
   }
-  presentDocument = null; // this was why we were getting stale reference errors again
-
+  // presentDocument removal now is here
+  presentDocument = null;
 
   const messageContent: TimerMessaging = {
     messageType: TimerMessage.RESET_SESSION
   };
   port.postMessage(messageContent);
 
-  // clear poll interval since we're not presenting anymore again
 
-  if (timerSyncInterval) {
-    clearInterval(timerSyncInterval);
-    timerSyncInterval = null;
+  // clear all active intervals | slideChange, stateSync, render
+
+  if (slideCheckInterval) {
+    clearInterval(slideCheckInterval);
+    slideCheckInterval = null;
+  }
+
+  if (stateSyncInterval) {
+    clearInterval(stateSyncInterval);
+    stateSyncInterval = null;
+  }
+
+  if (renderLoopId) {
+    cancelAnimationFrame(renderLoopId);
+    renderLoopId = null;
   }
 }
 
@@ -112,13 +138,18 @@ function getCurrentSlideId(): string {
   return matches ? matches[1] : "";
 }
 
-function extractFromCurrentSlide() {
+function extractFromCurrentSlide(): boolean {
   const slideId = getCurrentSlideId();
-  if (!slideId) { return; } 
-  // this really shouldn't ever be fulfilled in present mode, unless the link got clapped
+  if (!slideId) {
+    //console.log("GFN Timer: extract -> no slideId");
+    return false;
+  }
 
   const doc = getPresentDocument();
-  if (!doc) { return; }
+  if (!doc) {
+    //console.log("GFN Timer: extract -> no presentDocument");
+    return false;
+  }
 
   const allTextNodes = doc.querySelectorAll<SVGTextElement>(TEXT_NODE_QUERY);
   const foundTimers: TimerData[] = [];
@@ -138,6 +169,7 @@ function extractFromCurrentSlide() {
     tokenInd++;
   }
 
+ 
   if (foundTimers.length > 0) {
     const messageContent:TimerMessaging = {
       messageType: TimerMessage.REGISTER_TIMERS,
@@ -146,10 +178,14 @@ function extractFromCurrentSlide() {
 
     port.postMessage(messageContent);
   }
+
+  return true;
 }
 
 
-function onSlideChanged() {
+function onSlideChanged(): boolean {
+  // we'll go with polling for this; in case google engineers change how the dom renders slides
+  //  this is a more robust, stable method that will likely require less dev intervention
   const slideId = getCurrentSlideId();
 
   const messageContent:TimerMessaging = {
@@ -159,8 +195,7 @@ function onSlideChanged() {
 
   port.postMessage(messageContent);
 
-  extractFromCurrentSlide();
-  
+  return extractFromCurrentSlide();
 }
 
 function getTimerStates() {
@@ -195,24 +230,36 @@ function isInPresentMode(): boolean {
   return document.querySelector(PRESENT_MODE_CONTAINER) !== null;
 }
 
-function syncTimers() {
-  // run every second while in present mode
+
+// check for slide change, called every sec approximately
+function checkSlideChange() {
   if (!inPresentMode) return;
 
   const id = getCurrentSlideId();
   if (id !== currentSlideId) {
-    currentSlideId = id;
-    onSlideChanged();
+    //console.log("GFN Timer: slide changed from", currentSlideId, "to", id);
+    if (onSlideChanged()) {
+      currentSlideId = id; // only commit if extraction succeeded (iframe may not be ready yet)
+      getTimerStates();
+    }
   }
-
-  getTimerStates();
 }
 
-function renderTimerStates(timerStates: TimerStates) {
-  for (const timerState of timerStates.timers) {
-    const nodeRef = timerElmRecord[timerState.id];
-    if (!nodeRef) { continue; }
-
-    nodeRef.textContent = formatTimer(timerState, currentOptions);
+// now we can render our updates by accessing animation frames, snappy, responsive updates
+function renderLoop() {
+  if (!inPresentMode) {
+    renderLoopId = null;
+    return;
   }
+
+  if (cachedTimerStates) {
+    for (const timerState of cachedTimerStates.timers) {
+      const nodeRef = timerElmRecord[timerState.id];
+      if (!nodeRef) { continue; }
+
+      nodeRef.textContent = formatTimer(timerState, currentOptions);
+    }
+  }
+
+  renderLoopId = requestAnimationFrame(renderLoop);
 }
