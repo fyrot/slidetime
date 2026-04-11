@@ -5,6 +5,10 @@ import { TimerMessage, type TimerData, type TimerMessaging, type TimerStates } f
 
 console.log("GFN Timer: content script injected");
 
+// variable interval ping definitions
+const SLIDE_CHANGED_INTERVAL = 100; // 0.1s
+const STATE_SYNC_INTERVAL = 5000;
+
 // for selecting text nodes from rendered slide
 
 const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
@@ -75,17 +79,19 @@ function enterPresentMode() {
   inPresentMode = true;
   currentSlideId = "";
 
+  setTimeout(() => {}, 1000);
+
   // slide change detection, operates on a faster interval for "responsiveness"
   if (!slideCheckInterval) {
     checkSlideChange(); // run immediately on enter
-    slideCheckInterval = setInterval(checkSlideChange, 1000);
+    slideCheckInterval = setInterval(checkSlideChange, SLIDE_CHANGED_INTERVAL);
   }
 
   // slower interval state sync to refresh cached states from background store
   // -> also serves as a heartbeat to keep the service worker alive
   if (!stateSyncInterval) {
     getTimerStates();
-    stateSyncInterval = setInterval(getTimerStates, 5000);
+    stateSyncInterval = setInterval(getTimerStates, STATE_SYNC_INTERVAL);
   }
 
   // render loop, runs every frame and does local calculations
@@ -141,13 +147,13 @@ function getCurrentSlideId(): string {
 function extractFromCurrentSlide(): boolean {
   const slideId = getCurrentSlideId();
   if (!slideId) {
-    //console.log("GFN Timer: extract -> no slideId");
+    console.log("GFN Timer: extract -> no slideId");
     return false;
   }
 
   const doc = getPresentDocument();
   if (!doc) {
-    //console.log("GFN Timer: extract -> no presentDocument");
+    console.log("GFN Timer: extract -> no presentDocument");
     return false;
   }
 
@@ -169,6 +175,8 @@ function extractFromCurrentSlide(): boolean {
     tokenInd++;
   }
 
+
+  console.log("GFN Timer: Parsed", tokenInd, "timer tokens");
  
   if (foundTimers.length > 0) {
     const messageContent:TimerMessaging = {
@@ -238,10 +246,11 @@ function checkSlideChange() {
   const id = getCurrentSlideId();
   if (id !== currentSlideId) {
     //console.log("GFN Timer: slide changed from", currentSlideId, "to", id);
-    if (onSlideChanged()) {
-      currentSlideId = id; // only commit if extraction succeeded (iframe may not be ready yet)
-      getTimerStates();
-    }
+    if (!getPresentDocument()) { return; }
+    console.log("GFN Timer: slide changed, doc present");
+    currentSlideId = id;
+    onSlideChanged();
+    getTimerStates();
   }
 }
 
