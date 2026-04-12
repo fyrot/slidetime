@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, type ReactElement, type CSSPr
 import ReferenceTab from "./reference_tab"
 import SettingsTab from "./settings_tab"
 import PersonalizeTab from "./personalize_tab"
-import theme from "./theme"
+import { useTheme } from "./theme_context"
 
 import { LucideBookText, LucideCog, LucideSwatchBook } from "lucide-react"
 
@@ -23,20 +23,8 @@ function hexToRgb(hex: string): string {
   return `${r}, ${g}, ${b}`
 }
 
-function buildTabStyle(tabStyle: typeof theme.tabSelector.idle): CSSProperties {
-  const style: CSSProperties = { color: tabStyle.color }
-  if (tabStyle.background) {
-    const rgb = hexToRgb(tabStyle.background)
-    style.background = `rgba(${rgb}, ${tabStyle.opacity ?? 1})`
-  }
-  if (tabStyle.blur) {
-    style.backdropFilter = `blur(${tabStyle.blur})`
-    style.WebkitBackdropFilter = `blur(${tabStyle.blur})`
-  }
-  return style
-}
-
 function TestPopup() {
+  const { theme } = useTheme()
   const [activeTab, setActiveTab] = useState<TabId>("reference")
   const [hoveredTab, setHoveredTab] = useState<TabId | null>(null)
   const [showTopFade, setShowTopFade] = useState(false)
@@ -59,12 +47,25 @@ function TestPopup() {
     ? `blur(${theme.effects.overlay.blur})`
     : undefined
 
+  function buildTabStyle(tabStyle: typeof theme.tabSelector.idle): CSSProperties {
+    const style: CSSProperties = { color: tabStyle.color }
+    if (tabStyle.background) {
+      const rgb = hexToRgb(tabStyle.background)
+      style.background = `rgba(${rgb}, ${tabStyle.opacity ?? 1})`
+    }
+    if (tabStyle.blur) {
+      style.backdropFilter = `blur(${tabStyle.blur})`
+      style.WebkitBackdropFilter = `blur(${tabStyle.blur})`
+    }
+    return style
+  }
+
   return (
     <div
       className="w-[325px] h-[425px] relative font-sans overflow-hidden flex flex-col"
       style={{ background: theme.surface.base, color: theme.text.primary }}
     >
-      {/* actual tab content is rendered here*/}
+      {/* actual tab content is rendered here */}
       <div
         ref={scrollRef}
         onScroll={updateFades}
@@ -75,7 +76,7 @@ function TestPopup() {
         {activeTab === "personalize" && <PersonalizeTab />}
       </div>
 
-      {/* top scroll content fade goes here*/}
+      {/* top scroll content fade */}
       <div
         className={`absolute top-0 left-0 right-0 h-14 pointer-events-none transition-opacity duration-200 ${
           showTopFade ? "opacity-100" : "opacity-0"
@@ -83,12 +84,12 @@ function TestPopup() {
         style={{ background: `linear-gradient(to bottom, ${theme.effects.fade}, transparent)` }}
       />
 
-      {/* footer bar contains text for the app name and "navigation" info */}
+      {/* footer content */}
       <div className="px-4 py-2 text-center" style={{ color: theme.text.muted }}>
-        <p className="text-[10px]">slidetime / {activeTab}</p>
+        <p className="text-[10px]">slidetime / {activeTab}</p> {/* "navigation" display */}
       </div>
 
-      {/* bottom scroll content fade goes here*/}
+      {/* bottom scroll content fade */}
       <div
         className={`absolute bottom-6 left-0 right-0 h-12 pointer-events-none transition-opacity duration-200 ${
           showBottomFade ? "opacity-100" : "opacity-0"

@@ -1,9 +1,9 @@
-import theme from "./theme"
+import ThemeSelector from "./components/theme_selector"
 
 function PersonalizeTab() {
   return (
-    <div style={{ color: theme.text.secondary }}>
-      <p className="text-sm">Personalize</p>
+    <div className="space-y-2.5">
+      <ThemeSelector />
     </div>
   )
 }

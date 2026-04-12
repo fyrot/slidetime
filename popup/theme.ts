@@ -11,6 +11,10 @@ interface TabButtonStyle {
 }
 
 export interface PopupTheme {
+  id: string
+  displayName: string
+  themeDisplayColor: string  // color to be used when rendering theme selectors
+  
   surface: {
     base: string             // main popup background
     elevated: string         // cards, raised containers
@@ -42,8 +46,13 @@ export interface PopupTheme {
   }
 }
 
-// Default dark theme
+
+// now useless export, keeping it here for later reference in case needed
+/*// Default dark theme
 const darkTheme: PopupTheme = {
+  id: "dark",
+  displayName: "Slate",
+  themeDisplayColor: "#1a1a1a",
   surface: {
     base: "#1a1a1a",
     elevated: "#252525",
@@ -85,3 +94,4 @@ const darkTheme: PopupTheme = {
 }
 
 export default darkTheme
+*/

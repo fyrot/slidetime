@@ -1,0 +1,43 @@
+{
+  "id": "dark",
+  "displayName": "Slate",
+  "themeDisplayColor": "#1a1a1a",
+  "surface": {
+    "base": "#1a1a1a",
+    "elevated": "#252525",
+    "overlay": "#252525",
+    "code": "#222222"
+  },
+  "text": {
+    "primary": "#e8e8e8",
+    "secondary": "#999999",
+    "muted": "#666666",
+    "accent": "#ffffff"
+  },
+  "border": {
+    "default": "#333333",
+    "active": "#555555",
+    "subtle": "#3a3a3a"
+  },
+  "effects": {
+    "overlay": {
+      "opacity": 0.4,
+      "blur": "12px"
+    },
+    "fade": "#1a1a1a"
+  },
+  "tabSelector": {
+    "idle": {
+      "color": "#999999"
+    },
+    "hover": {
+      "color": "#dddddd",
+      "background": "#ffffff",
+      "opacity": 0.0
+    },
+    "active": {
+      "color": "#000000",
+      "background": "#ffffff"
+    }
+  }
+}

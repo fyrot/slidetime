@@ -1,6 +1,7 @@
-import theme from "./theme"
+import { useTheme } from "./theme_context"
 
 function CommandCard(props: { command: string; description: string }) {
+  const { theme } = useTheme()
   const { command, description } = props
 
   return (
@@ -24,34 +25,13 @@ function CommandCard(props: { command: string; description: string }) {
 function ReferenceTab() {
   return (
     <div className="space-y-2.5">
-      <CommandCard
-        command="<<mm:ss->>"
-        description="Countdown timer starting from mm:ss, counts down to 0:00."
-      />
-      <CommandCard
-        command="<<mm:ss+>>"
-        description="Stopwatch counting up from mm:ss."
-      />
-      <CommandCard
-        command="<<time>>"
-        description="Displays the current time in hh:mm:ss format."
-      />
-      <CommandCard
-        command="<<date>>"
-        description="Displays the current date (MM/DD/YYYY)."
-      />
-      <CommandCard
-        command="<<shortdate>>"
-        description="Short date format (e.g. Sat, Apr 4, 2026)."
-      />
-      <CommandCard
-        command="<<longdate>>"
-        description="Long date format (e.g. Saturday, April 4, 2026)."
-      />
-      <CommandCard
-        command="<<timetoHH:MM>>"
-        description="Countdown to the next occurrence of the specified time (e.g. <<timeto2:00>>)."
-      />
+      <CommandCard command="<<mm:ss->>" description="Countdown timer starting from mm:ss, counts down to 0:00." />
+      <CommandCard command="<<mm:ss+>>" description="Stopwatch counting up from mm:ss." />
+      <CommandCard command="<<time>>" description="Displays the current time in hh:mm:ss format." />
+      <CommandCard command="<<date>>" description="Displays the current date (MM/DD/YYYY)." />
+      <CommandCard command="<<shortdate>>" description="Short date format (e.g. Sat, Apr 4, 2026)." />
+      <CommandCard command="<<longdate>>" description="Long date format (e.g. Saturday, April 4, 2026)." />
+      <CommandCard command="<<timetoHH:MM>>" description="Countdown to the next occurrence of the specified time (e.g. <<timeto2:00>>)." />
     </div>
   )
 }
