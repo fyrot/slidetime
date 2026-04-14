@@ -36,6 +36,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           setThemeState(fallback)
           persistThemeId(fallback.id)
         }
+      } else {
+        const fallback = getDefaultTheme()
+        persistThemeId(fallback.id)
       }
     })
   }, [])
