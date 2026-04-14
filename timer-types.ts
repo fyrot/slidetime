@@ -6,7 +6,12 @@ export enum TimerMessage {
   HEART_BEAT = "HEART_BEAT"
 }
 
-export type TimerType = "time" | "countdown" | "stopwatch" | "date" | "shortdate" | "longdate"
+export type TimerType = "time" | "shorttime" | "longtime" |"countdown" | "stopwatch" | "date" | "shortdate" | "longdate"
+
+
+export enum TimerFlag {
+  HR24 = "24hr",
+}
 
 export interface TimerData {
   id: string
@@ -14,6 +19,7 @@ export interface TimerData {
   slideId: string // google presents the slide id in the url "hash"
 
   duration?: number
+  flags?: TimerFlag[]
 }
 
 export interface TimerState extends TimerData {

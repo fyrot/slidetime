@@ -1,43 +1,55 @@
+import { TimerFlag } from "~timer-types";
 import type { TimerData, TimerType } from "~timer-types";
 
-
-// regex matches for <<time>> or <<countdown:mm::ss>>
-// we can expand it to be more robust/flexible later
-// ex: only check for the beginning "time", "countdown" etc. in the string, conditionally check the rest for flags
-
-const TIMER_REGEX = /^<<(?:(time|date|shortdate|longdate)|(timeto)(\d{1,2}):(\d{2})|(\d+):(\d{2})([+-]))>>$/
+// Format: <<timerExpr>> or <<timerExpr|flag1&flag2&flag3>>
+// timerExpr is one of:
+//   keyword  → time | date | shortdate | longdate
+//   timeto   → ~H:MM  (first char ~ = "time until next occurrence")
+//   stopwatch/countdown → mm:ss+ or mm:ss-  (last char determines direction)
+const TIMER_REGEX = /^<<([^|>]+?)(?:\|([^>]*))?>>$/;
 
 export interface ParsedTimerToken {
   timerType: TimerType
   duration?: number
+  flags?: TimerFlag[]
 }
 
 export function parseTimerToken(tokenTxt: string) {
   const matches = tokenTxt.trim().match(TIMER_REGEX);
   if (!matches) { return null; }
 
-  if (matches[1]) {
-    switch (matches[1]) {
-      case "time":
-        return parseTokenTime();
-      case "date":
-        return parseTokenDate();
-      case "shortdate":
-        return parseTokenDate("shortdate");
-      case "longdate":
-        return parseTokenDate("longdate");
+  const timerExpr = matches[1];
+  const knownFlagValues = new Set<string>(Object.values(TimerFlag));
+  const flags: TimerFlag[] = matches[2]
+    ? matches[2].split("&").map(f => f.trim()).filter((f): f is TimerFlag => knownFlagValues.has(f))
+    : [];
+
+  // ~HH:MM → timeto (countdown to next occurrence of that time)
+  if (timerExpr[0] === "~") {
+    return parseTokenTimeTo(timerExpr.slice(1), flags);
+  }
+
+  // mm:ss+ or mm:ss- → stopwatch or countdown
+  const lastChar = timerExpr[timerExpr.length - 1];
+  if (lastChar === "+" || lastChar === "-") {
+    const timeStr = timerExpr.slice(0, -1);
+    const timeMatch = timeStr.match(/^(\d+):(\d{2})$/);
+    if (!timeMatch) { return null; }
+    if (lastChar === "+") {
+      return parseTokenStopwatch(timeMatch[1], timeMatch[2], flags);
+    } else {
+      return parseTokenCountdown(timeMatch[1], timeMatch[2], flags);
     }
   }
-  else if (matches[2] === "timeto") {
-    return parseTokenTimeTo(matches[3], matches[4]);
-  }
-  else if (matches[7]) {
-    if (matches[7] === "+") {
-      return parseTokenStopwatch(matches[5], matches[6]);
-    } 
-    else if (matches[7] === "-") {
-      return parseTokenCountdown(matches[5], matches[6]);
-    }
+
+  // keyword timers
+  switch (timerExpr) {
+    case "time":       return parseTokenTime("time", flags);
+    case "shorttime":  return parseTokenTime("shorttime", flags); // alias for time, same formatting options
+    case "longtime":   return parseTokenTime("longtime", flags);
+    case "date":       return parseTokenDate("date", flags);
+    case "shortdate":  return parseTokenDate("shortdate", flags);
+    case "longdate":   return parseTokenDate("longdate", flags);
   }
 
   return null;
@@ -49,61 +61,64 @@ export function buildTimerData(timerToken: ParsedTimerToken, tokenInd: number, s
     id: `${slideId}-${tokenInd}`,
     timerType: timerToken.timerType,
     slideId: slideId,
-    duration: timerToken.duration
+    duration: timerToken.duration,
+    flags: timerToken.flags
   }
 
   return timerData;
 }
 
 // helper functions for parseToken
-function parseTokenTime() {
+function parseTokenTime(type: "time" | "shorttime" | "longtime", flags: TimerFlag[]) {
   const timerObj: ParsedTimerToken = {
-    timerType: "time"
-  }
-  
+    timerType: type,
+    flags
+  };
   return timerObj;
 }
 
-function parseTokenCountdown(minutesStr: string, secondsStr: string) {
-  const minutes = parseInt(minutesStr ?? "0"); // defaults to 0 if not provided
+// TODO: allow countdown and stopwatch to include hours as well
+function parseTokenCountdown(minutesStr: string, secondsStr: string, flags: TimerFlag[]) {
+  const minutes = parseInt(minutesStr ?? "0");
   const seconds = parseInt(secondsStr ?? "0");
-
   const totalSeconds = minutes * 60 + seconds;
 
   const timerObj: ParsedTimerToken = {
     timerType: "countdown",
-    duration: totalSeconds
+    duration: totalSeconds,
+    flags
   };
-
   return timerObj;
 }
 
-function parseTokenStopwatch(minutesStr: string, secondsStr: string) {
-  const minutes = parseInt(minutesStr ?? "0"); // defaults to 0 if not provided
+function parseTokenStopwatch(minutesStr: string, secondsStr: string, flags: TimerFlag[]) {
+  const minutes = parseInt(minutesStr ?? "0");
   const seconds = parseInt(secondsStr ?? "0");
-
   const totalSeconds = minutes * 60 + seconds;
 
   const timerObj: ParsedTimerToken = {
     timerType: "stopwatch",
-    duration: totalSeconds
+    duration: totalSeconds,
+    flags
   };
-
   return timerObj;
 }
 
-function parseTokenDate(type: string = "date") {
+function parseTokenDate(type: string = "date", flags: TimerFlag[]) {
   const timerObj: ParsedTimerToken = {
-    timerType: type as TimerType
-  }
-
+    timerType: type as TimerType,
+    flags
+  };
   return timerObj;
 }
 
- // TODO: allow the countdown to include hours as well, but most tests should be less than an hour
-function parseTokenTimeTo(hoursStr: string, minutesStr: string) {
-  let hours = parseInt(hoursStr ?? "0");
-  const minutes = parseInt(minutesStr ?? "0");
+// TODO: allow the countdown to include hours as well, but most tests should be less than an hour
+function parseTokenTimeTo(timeStr: string, flags: TimerFlag[]) {
+  const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (!timeMatch) { return null; }
+
+  let hours = parseInt(timeMatch[1] ?? "0");
+  const minutes = parseInt(timeMatch[2] ?? "0");
 
   const now = new Date();
   let targetTime: Date;
@@ -133,9 +148,9 @@ function parseTokenTimeTo(hoursStr: string, minutesStr: string) {
 
   const timerObj: ParsedTimerToken = {
     timerType: "countdown",
-    duration: durationSeconds
+    duration: durationSeconds,
+    flags
   };
 
   return timerObj;
-
 }
