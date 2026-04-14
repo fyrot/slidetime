@@ -1,0 +1,43 @@
+{
+  "id": "aggie",
+  "displayName": "Gig-abit",
+  "themeDisplayColor": "#500000",
+  "surface": {
+    "base": "#2E0000",
+    "elevated": "#500000",
+    "overlay": "#500000",
+    "code": "#380808"
+  },
+  "text": {
+    "primary": "#FFFFFF",
+    "secondary": "#D1D1D1",
+    "muted": "#A08080",
+    "accent": "#FFFFFF"
+  },
+  "border": {
+    "default": "#732F2F",
+    "active": "#D6D3C4",
+    "subtle": "#5A1A1A"
+  },
+  "effects": {
+    "overlay": {
+      "opacity": 0.5,
+      "blur": "12px"
+    },
+    "fade": "#2E0000"
+  },
+  "tabSelector": {
+    "idle": {
+      "color": "#D1D1D1"
+    },
+    "hover": {
+      "color": "#FFFFFF",
+      "background": "#FFFFFF",
+      "opacity": 0.1
+    },
+    "active": {
+      "color": "#500000",
+      "background": "#FFFFFF"
+    }
+  }
+}

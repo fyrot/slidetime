@@ -1,7 +1,7 @@
-import { formatTimer } from "~format-time";
+import { formatTimer, getElapsedMs } from "~format-time";
 import type { PlasmoCSConfig } from "plasmo";
 import { buildTimerData, parseTimerToken } from "~parse-timers";
-import { TimerMessage, type TimerData, type TimerMessaging, type TimerStates } from "~timer-types";
+import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types";
 
 console.log("GFN Timer: content script injected");
 
@@ -17,6 +17,7 @@ let extractRetries = 0;
 const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
 
 const timerElmRecord: Record<string, SVGTextElement> = {};
+const firedSet = new Set<string>();
 
 const PORT_NAME = "gfn-timer";
 const SLIDE_ID_REGEX = /slide=([^&]+)/;
@@ -125,6 +126,7 @@ function exitPresentMode() {
 
   // reset cached states
   cachedTimerStates = null;
+  firedSet.clear();
 
   // clear stale element and document references so re-entering present mode rescans
   for (const key of Object.keys(timerElmRecord)) {
@@ -284,6 +286,30 @@ function checkSlideChange() {
   }
 }
 
+// used for the autoadvance feature
+function advanceSlide() {
+  const doc = getPresentDocument();
+  if (!doc) return;
+  // should only be called in renderer, this is just here in case something goes really wrong
+  
+  const wrapper = doc.querySelector<HTMLElement>(SLIDE_WRAPPER_QUERY);
+  if (!wrapper) return;
+  wrapper.click();
+}
+
+function checkAutoAdvance(timerState: TimerState) {
+  if (!currentOptions["countdownAdvance"]) { return; }
+  if (timerState.timerType !== "countdown") { return; }
+  if (firedSet.has(timerState.id)) { return; }
+
+  const elapsedMs = getElapsedMs(timerState);
+  const remainingSec = (timerState.duration ?? 0) - Math.floor(elapsedMs / 1000);
+  if (remainingSec <= 0) {
+    firedSet.add(timerState.id);
+    advanceSlide();
+  }
+}
+
 // now we can render our updates by accessing animation frames, snappy, responsive updates
 function renderLoop() {
   if (!inPresentMode) {
@@ -297,6 +323,7 @@ function renderLoop() {
       if (!nodeRef) { continue; }
 
       nodeRef.textContent = formatTimer(timerState, currentOptions);
+      checkAutoAdvance(timerState);
     }
   }
 

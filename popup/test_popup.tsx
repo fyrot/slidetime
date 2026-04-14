@@ -39,7 +39,7 @@ function TestPopup() {
   }, [])
 
   useEffect(() => {
-    updateFades()
+    requestAnimationFrame(updateFades)
   }, [activeTab, updateFades])
 
   const overlayBg = `rgba(${hexToRgb(theme.surface.overlay)}, ${theme.effects.overlay.opacity})`
@@ -78,7 +78,7 @@ function TestPopup() {
 
       {/* top scroll content fade */}
       <div
-        className={`absolute top-0 left-0 right-0 h-14 pointer-events-none transition-opacity duration-200 ${
+        className={`absolute top-0 left-0 right-0 h-14 pointer-events-none transition-opacity duration-75 ${
           showTopFade ? "opacity-100" : "opacity-0"
         }`}
         style={{ background: `linear-gradient(to bottom, ${theme.effects.fade}, transparent)` }}
@@ -91,7 +91,7 @@ function TestPopup() {
 
       {/* bottom scroll content fade */}
       <div
-        className={`absolute bottom-6 left-0 right-0 h-12 pointer-events-none transition-opacity duration-200 ${
+        className={`absolute bottom-6 left-0 right-0 h-12 pointer-events-none transition-opacity duration-75 ${
           showBottomFade ? "opacity-100" : "opacity-0"
         }`}
         style={{ background: `linear-gradient(to top, ${theme.effects.fade}, transparent)` }}

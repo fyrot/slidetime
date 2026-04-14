@@ -14,19 +14,23 @@ function ToggleSettingCard({ setting }: { setting: ToggleSetting }) {
   const [enabled, setEnabled] = useState(false)
 
   useEffect(() => {
-
-    chrome.storage.local.get([setting.key], (result) => {
-      if (result[setting.key] !== undefined) {
-        setEnabled(result[setting.key])
+    chrome.storage.local.get(["timerOptionStates"], (result) => {
+      const opts = result.timerOptionStates ?? {}
+      // fix for matching options states
+      if (opts[setting.key] !== undefined) {
+        setEnabled(opts[setting.key])
       }
     })
-
   }, [setting.key])
 
   function handleToggle() {
     const next = !enabled
     setEnabled(next)
-    chrome.storage.local.set({ [setting.key]: next })
+    chrome.storage.local.get(["timerOptionStates"], (result) => {
+      const opts = result.timerOptionStates ?? {}
+      opts[setting.key] = next
+      chrome.storage.local.set({ timerOptionStates: opts })
+    })
   }
 
   return (

@@ -12,6 +12,11 @@ const booleanSettings: ToggleSetting[] = [
     key: "24hr",
     name: "Military Time",
     description: "Display time in a 24 hour format"
+  },
+  {
+    key: "countdownAdvance",
+    name: "Advance Countdown",
+    description: "Move forward one slide when a countdown reaches 0:00"
   }
 ]
 
@@ -21,6 +26,8 @@ function SettingsTab() {
   return (
     <div style={{ color: theme.text.secondary }} className="space-y-2.5">
       {/* <p className="text-sm">Settings</p> */}
+
+      { /* boolean settings use toggle setting card for rendering*/ }
       {booleanSettings.map((settingData) => {
         return <ToggleSettingCard setting={settingData} /> 
       }) }
