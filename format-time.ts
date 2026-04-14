@@ -5,27 +5,42 @@ import type { TimerState } from "~timer-types";
 // note for later: add some type of array or set to timer state where we can store and reference "format flags"
 
 export function formatTimer(timerState: TimerState, options: Record<string, boolean> = {}):string {
+  // merge per-timer flags on top of global options (per-timer flags take precedence)
+  const mergedOptions: Record<string, boolean> = { ...options };
+  for (const flag of timerState.flags ?? []) {
+    mergedOptions[flag] = true;
+  }
+
   switch (timerState.timerType) {
     case "time":
-      return formatTime(options);
+      return formatTime("time", mergedOptions);
+    case "shorttime":
+      return formatTime("shorttime", mergedOptions);
+    case "longtime":
+      return formatTime("longtime", mergedOptions);
     case "countdown":
-      return formatCountdown(timerState);
+      return formatCountdown(timerState, mergedOptions);
     case "stopwatch":
-      return formatStopwatch(timerState);
+      return formatStopwatch(timerState, mergedOptions);
     case "date":
-      return formatDate();
+      return formatDate("date", mergedOptions);
     case "shortdate":
-      return formatDate("shortdate");
+      return formatDate("shortdate", mergedOptions);
     case "longdate":
-      return formatDate("longdate");
+      return formatDate("longdate", mergedOptions);
   }
 }
 
-export function formatTime(options: Record<string, boolean> = {}):string {
-  const is24Hr = options["24hr"] ?? false; // should exist but just in case
+export function formatTime(type: "time" | "shorttime" | "longtime" = "time", options: Record<string, boolean> = {}):string {
+  const is24Hr = options["24hr"] ?? false;
   const currentDate = new Date();
-  
-  return currentDate.toLocaleTimeString([], { hour12: !is24Hr });
+  if (type === "shorttime") {
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit" });
+  } else if (type === "longtime") {
+    return currentDate.toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: !is24Hr });
+  } else {
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit" });
+  }
 }
 
 // we want to be "second"-agnostic if that makes sense
@@ -36,7 +51,7 @@ export function getElapsedMs(timerState: TimerState): number {
   return timerState.accumulatedMs + active;
 }
 
-export function formatCountdown(timerState: TimerState):string {
+export function formatCountdown(timerState: TimerState, options: Record<string, boolean> = {}):string {
   // this code currently assumes seconds as the primary unit of time still, here for now
   const elapsedSec = Math.floor(getElapsedMs(timerState) / 1000);
   const remainingRaw = (timerState.duration ?? 0) - elapsedSec;
@@ -46,7 +61,7 @@ export function formatCountdown(timerState: TimerState):string {
   return `${minutes}:${padTwoZeros(seconds)}`;
 }
 
-export function formatStopwatch(timerState: TimerState):string {
+export function formatStopwatch(timerState: TimerState, options: Record<string, boolean> = {}):string {
   // same as formatCountdown's comment, default for now is seconds as our leading unit
   const elapsedSec = Math.floor(getElapsedMs(timerState) / 1000);
   // duration acts as the starting point
@@ -56,7 +71,7 @@ export function formatStopwatch(timerState: TimerState):string {
   return `${minutes}:${padTwoZeros(seconds)}`;
 }
 
-export function formatDate(type: "date" | "shortdate" | "longdate" = "date"):string {
+export function formatDate(type: "date" | "shortdate" | "longdate" = "date", options: Record<string, boolean> = {}):string {
   const currentDate = new Date();
   if (type === "date") return currentDate.toLocaleDateString(); // 4/4/2026
   else if (type === "shortdate") return currentDate.toLocaleDateString([], { weekday : "short", month: "short", day: "numeric", year: "numeric" }); // Sat, Apr 4, 2026
