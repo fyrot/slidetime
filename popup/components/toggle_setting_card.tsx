@@ -49,9 +49,9 @@ function ToggleSettingCard({ setting }: { setting: ToggleSetting }) {
         
         {/* setting name pill */ }
         <span
-          className="text-xs font-bold py-2 px-4 rounded-full"
+          className="text-xs font-bold py-2 px-4 rounded-2xl"
           style={{
-            color: theme.text.accent,
+            color: theme.text.code,
             background: theme.surface.code,
             borderWidth: 1,
             borderStyle: "solid",
@@ -67,7 +67,7 @@ function ToggleSettingCard({ setting }: { setting: ToggleSetting }) {
           aria-checked={enabled}
           className="grid h-5 w-9 shrink-0 cursor-pointer items-center rounded-full p-[3px] transition-colors duration-200"
           style={{
-            background: enabled ? theme.text.accent : theme.border.default,
+            background: enabled ? theme.text.accent : theme.surface.toggle,
             gridTemplateColumns: enabled ? "1fr auto 0fr" : "0fr auto 1fr",
             transition: "grid-template-columns 200ms ease, background-color 200ms ease",
           }}

@@ -20,12 +20,14 @@ export interface PopupTheme {
     elevated: string         // cards, raised containers
     overlay: string          // elements floating over content (tab selector)
     code: string             // code/mono blocks
+    toggle: string           // toggle track background (disabled state)
   }
   text: {
     primary: string          // main readable text
     secondary: string        // supporting/descriptive text
     muted: string            // de-emphasized text (footer, hints)
     accent: string           // highlighted/active text
+    code: string             // text inside code/mono blocks
   }
   border: {
     default: string          // standard borders

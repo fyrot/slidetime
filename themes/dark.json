@@ -6,13 +6,15 @@
     "base": "#1a1a1a",
     "elevated": "#252525",
     "overlay": "#252525",
-    "code": "#222222"
+    "code": "#222222",
+    "toggle": "#333333"
   },
   "text": {
     "primary": "#e8e8e8",
     "secondary": "#999999",
     "muted": "#666666",
-    "accent": "#ffffff"
+    "accent": "#ffffff",
+    "code": "#e8e8e8"
   },
   "border": {
     "default": "#333333",

@@ -11,7 +11,7 @@ function CommandCard(props: { command: string; description: string }) {
     >
       <code
         className="font-mono text-xs font-bold px-2 py-0.5 rounded"
-        style={{ color: theme.text.accent, background: theme.surface.code, borderWidth: 1, borderStyle: "solid", borderColor: theme.border.subtle }}
+        style={{ color: theme.text.code, background: theme.surface.code, borderWidth: 1, borderStyle: "solid", borderColor: theme.border.subtle }}
       >
         {command}
       </code>
