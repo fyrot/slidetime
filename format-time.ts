@@ -56,8 +56,10 @@ export function formatCountdown(timerState: TimerState, options: Record<string, 
   const elapsedSec = Math.floor(getElapsedMs(timerState) / 1000);
   const remainingRaw = (timerState.duration ?? 0) - elapsedSec;
   const remaining = Math.max(remainingRaw, 0);
-  const minutes = Math.floor(remaining / 60);
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
   const seconds = remaining % 60;
+  if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
   return `${minutes}:${padTwoZeros(seconds)}`;
 }
 
@@ -66,8 +68,10 @@ export function formatStopwatch(timerState: TimerState, options: Record<string, 
   const elapsedSec = Math.floor(getElapsedMs(timerState) / 1000);
   // duration acts as the starting point
   const totalRaw = (timerState.duration ?? 0) + elapsedSec;
-  const minutes = Math.floor(totalRaw / 60);
+  const hours = Math.floor(totalRaw / 3600);
+  const minutes = Math.floor((totalRaw % 3600) / 60);
   const seconds = totalRaw % 60;
+  if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
   return `${minutes}:${padTwoZeros(seconds)}`;
 }
 
