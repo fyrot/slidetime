@@ -1,7 +1,8 @@
 {
   "id": "aggie",
-  "displayName": "Gig-abit",
+  "displayName": "Reveille",
   "themeDisplayColor": "#500000",
+  "iconPath": "/assets/128/light-alt.png",
   "surface": {
     "base": "#2E0000",
     "elevated": "#500000",

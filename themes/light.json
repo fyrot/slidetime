@@ -2,6 +2,7 @@
   "id": "light",
   "displayName": "Air",
   "themeDisplayColor": "#f5f5f5",
+  "iconPath": "/assets/128/light-alt.png",
 
   
   "surface": {

@@ -14,7 +14,8 @@ export interface PopupTheme {
   id: string
   displayName: string
   themeDisplayColor: string  // color to be used when rendering theme selectors
-  
+  iconPath: string           // path to toolbar icon for this theme (relative to extension root)
+
   surface: {
     base: string             // main popup background
     elevated: string         // cards, raised containers

@@ -2,6 +2,7 @@
   "id": "dark",
   "displayName": "Slate",
   "themeDisplayColor": "#1a1a1a",
+  "iconPath": "/assets/128/dark-alt.png",
   "surface": {
     "base": "#1a1a1a",
     "elevated": "#252525",
