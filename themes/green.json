@@ -1,0 +1,47 @@
+{
+  "id": "green",
+  "displayName": "Moss",
+  "themeDisplayColor": "#6b9b7a",
+  "iconPath": "/assets/128/light-alt.png",
+
+  "surface": {
+    "base": "#f5f5f0",
+    "elevated": "#eaece3",
+    "overlay": "#e3e9d6",
+    "code": "#4d8260",
+    "toggle": "#b8cdbf"
+  },
+  "text": {
+    "primary": "#17291c",
+    "secondary": "#3d6a4d",
+    "muted": "#6b9b7a",
+    "accent": "#4d8260",
+    "code": "#f5f5f0"
+  },
+  "border": {
+    "default": "#b8cdbf",
+    "active": "#4d8260",
+    "subtle": "#dce6de"
+  },
+  "effects": {
+    "overlay": {
+      "opacity": 0.85,
+      "blur": "12px"
+    },
+    "fade": "#f5f5f0"
+  },
+  "tabSelector": {
+    "idle": {
+      "color": "#6b9b7a"
+    },
+    "hover": {
+      "color": "#17291c",
+      "background": "#4d8260",
+      "opacity": 0.08
+    },
+    "active": {
+      "color": "#f5f5f0",
+      "background": "#4d8260"
+    }
+  }
+}
