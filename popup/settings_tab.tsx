@@ -15,7 +15,7 @@ const booleanSettings: ToggleSetting[] = [
   },
   {
     key: "countdownAdvance",
-    name: "Advance Countdown",
+    name: "Advanced Countdown",
     description: "Move forward one slide when a countdown reaches 0:00"
   }
 ]
