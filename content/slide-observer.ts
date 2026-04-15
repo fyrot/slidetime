@@ -2,8 +2,9 @@ import { formatTimer, getElapsedMs } from "~format-time";
 import type { PlasmoCSConfig } from "plasmo";
 import { buildTimerData, parseTimerToken } from "~parse-timers";
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types";
+import { debugLog } from "~utils/debug-options";
 
-console.log("GFN Timer: content script injected");
+debugLog("GFN Timer: content script injected");
 
 // variable interval ping definitions
 const SLIDE_CHANGED_INTERVAL = 100; // 0.1s
@@ -64,7 +65,7 @@ function makePort() {
 
   // render loop now acts on cached timer states
   newPort.onMessage.addListener((msg: TimerStates) => {
-    //console.log("GFN Timer: cached", msg.timers.length, "timers from BG");
+    //debugLog("GFN Timer: cached", msg.timers.length, "timers from BG");
     cachedTimerStates = msg;
   });
 
@@ -91,7 +92,7 @@ const outerObserver = new MutationObserver(() => {
 outerObserver.observe(document.body, { childList: true });
 
 function enterPresentMode() {
-  console.log("GFN Timer: enterPresentMode");
+  debugLog("GFN Timer: enterPresentMode");
   inPresentMode = true;
   currentSlideId = "";
   extractRetries = 0;
@@ -168,13 +169,13 @@ function getCurrentSlideId(): string {
 function extractFromCurrentSlide(): boolean {
   const slideId = getCurrentSlideId();
   if (!slideId) {
-    console.log("GFN Timer: extract -> no slideId");
+    debugLog("GFN Timer: extract -> no slideId");
     return false;
   }
 
   const doc = getPresentDocument();
   if (!doc) {
-    console.log("GFN Timer: extract -> no presentDocument");
+    debugLog("GFN Timer: extract -> no presentDocument");
     return false;
   }
 
@@ -197,7 +198,7 @@ function extractFromCurrentSlide(): boolean {
   }
 
 
-  console.log("GFN Timer: Parsed", tokenInd, "timer tokens");
+  debugLog(`GFN Timer: Parsed ${tokenInd} timer tokens`);
  
   if (foundTimers.length > 0) {
     const messageContent:TimerMessaging = {
@@ -266,18 +267,18 @@ function checkSlideChange() {
 
   const id = getCurrentSlideId();
   if (id !== currentSlideId) {
-    //console.log("GFN Timer: slide changed from", currentSlideId, "to", id);
+    //debugLog("GFN Timer: slide changed from", currentSlideId, "to", id);
     const doc = getPresentDocument();
     if (!doc) { return; }
 
-    console.log("trying..")
+    debugLog("trying..")
     if (onSlideChanged()) {
-      console.log("onslidechanged hit");
+      debugLog("onslidechanged hit");
       currentSlideId = id;
       extractRetries = 0;
       getTimerStates();
     } else if (extractRetries++ > INITIAL_RETRIES) {
-      console.log("extract retry limit hit");
+      debugLog("extract retry limit hit");
       currentSlideId = id;
       extractRetries = 0;
       getTimerStates();

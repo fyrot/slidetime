@@ -1,4 +1,5 @@
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
+import { debugLog } from "~utils/debug-options";
 
 // basically a universal source of truth for the other applications that should be accurate
 // NEW: now does not update elapsed time, rather acts as a db for the content scripts
@@ -64,7 +65,7 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
 
 
 function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
-  console.log("-- (Registering) --");
+  debugLog("-- (Registering) --");
   for (const timer of timers) {
     if (!session.timerStateRecord[timer.id]) {
       session.timerStateRecord[timer.id] = {
@@ -73,10 +74,10 @@ function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
         startedAt: null,
         accumulatedMs: 0
       };
-      console.log("Registered new timer");
+      debugLog("Registered new timer");
     }
   }
-  console.log("-- (Registered) -- ");
+  debugLog("-- (Registered) -- ");
   verifyActiveTimers(session);
 }
 
@@ -103,7 +104,7 @@ function verifyActiveTimers(session: SlidesSession) {
 function handleSlideChanged(session: SlidesSession, newSlideId: string) {
   session.activeSlideId = newSlideId;
   verifyActiveTimers(session);
-  console.log("Slide changed");
+  debugLog("Slide changed");
 }
 
 function handleGetTimerStates(session: SlidesSession) {
