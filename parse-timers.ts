@@ -125,30 +125,23 @@ function parseTokenTimeTo(timeStr: string, flags: TimerFlag[]) {
 
   if (hours >= 1 && hours <= 12) {
     hours = hours % 12;
-    // check today am/pm, and tomorrow am for next occurence of time, based on 12 hour system so that's probably the best way
     const amTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
     const pmTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours + 12, minutes, 0);
     const tmrwAmTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hours, minutes, 0);
 
-    const times = [amTime, pmTime, tmrwAmTime].filter(t => t.getTime() > now.getTime()); // only if in future
-    
-    times.sort((a, b) => a.getTime() - b.getTime()); // get soonest one
-    
+    const times = [amTime, pmTime, tmrwAmTime].filter(t => t.getTime() > now.getTime());
+    times.sort((a, b) => a.getTime() - b.getTime());
     targetTime = times[0];
   } else {
-    // 24 hour fallback
     targetTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
-    // if the target time has already passed today, assume they meant tomorrow
     if (targetTime.getTime() < now.getTime()) {
       targetTime.setDate(targetTime.getDate() + 1);
     }
   }
 
-  const durationSeconds = Math.floor((targetTime.getTime() - now.getTime()) / 1000);
-
   const timerObj: ParsedTimerToken = {
-    timerType: "countdown",
-    duration: durationSeconds,
+    timerType: "timeto",
+    duration: Math.floor(targetTime.getTime() / 1000), // store as epoch seconds; formatTimeTo computes diff fresh
     flags
   };
 

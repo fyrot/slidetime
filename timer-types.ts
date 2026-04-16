@@ -6,7 +6,7 @@ export enum TimerMessage {
   HEART_BEAT = "HEART_BEAT"
 }
 
-export type TimerType = "time" | "shorttime" | "longtime" |"countdown" | "stopwatch" | "date" | "shortdate" | "longdate"
+export type TimerType = "time" | "shorttime" | "longtime" | "countdown" | "stopwatch" | "timeto" | "date" | "shortdate" | "longdate"
 
 
 export enum TimerFlag {

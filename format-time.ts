@@ -22,6 +22,8 @@ export function formatTimer(timerState: TimerState, options: Record<string, bool
       return formatCountdown(timerState, mergedOptions);
     case "stopwatch":
       return formatStopwatch(timerState, mergedOptions);
+    case "timeto":
+      return formatTimeTo(timerState, mergedOptions);
     case "date":
       return formatDate("date", mergedOptions);
     case "shortdate":
@@ -46,6 +48,17 @@ export function formatTime(type: "time" | "shorttime" | "longtime" = "time", opt
 // we want to be "second"-agnostic if that makes sense
 // shifting to milliseconds as a more fluid unit of time so we can select for
 // dynamic units of time on user preference (for formats like countdown and stopwatch) if we want to
+export function formatTimeTo(timerState: TimerState, options: Record<string, boolean> = {}):string {
+  // duration stores absolute epoch seconds for timeto — compute diff fresh every frame
+  // Math.ceil so the last second is shown until the exact target moment (not swallowed early)
+  const remaining = Math.max(Math.ceil((timerState.duration ?? 0) - Date.now() / 1000), 0);
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  const seconds = remaining % 60;
+  if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
+  return `${minutes}:${padTwoZeros(seconds)}`;
+}
+
 export function getElapsedMs(timerState: TimerState): number {
   const active = timerState.startedAt ? Date.now() - timerState.startedAt : 0;
   return timerState.accumulatedMs + active;
