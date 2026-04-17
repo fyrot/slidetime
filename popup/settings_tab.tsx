@@ -17,6 +17,11 @@ const booleanSettings: ToggleSetting[] = [
     key: "countdownAdvance",
     name: "Advanced Countdown",
     description: "Move forward one slide when a countdown reaches 0:00"
+  },
+  {
+    key: "pausePlayTimers",
+    name: "Pause/Play Timers",
+    description: "Be able to pause/play presented timers by pressing 'p'"
   }
 ]
 

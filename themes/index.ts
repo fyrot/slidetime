@@ -10,7 +10,6 @@ const allThemes: PopupTheme[] = [
   dark as PopupTheme,
   aggie as PopupTheme,
   green as PopupTheme,
-
 ]
 
 export default allThemes

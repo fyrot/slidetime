@@ -39,6 +39,9 @@ function TestPopup() {
   }, [])
 
   useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0
+    }
     requestAnimationFrame(updateFades)
   }, [activeTab, updateFades])
 

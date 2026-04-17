@@ -1,25 +1,20 @@
-// this is used to detect theme on startup in order to set the appropriate icon, other session changes are handled by themes
+// icon selection is now disjoint from user theme selection, so we refer to its new independent storage key now
 
-// v2: we're going to make icon type disjoint from the selected theme
-//     there are way too many possible chrome theme combinations that user control seems like the best option here 
+// this, uniquely, has to run on startup/install because the toolbar should be set without needing to open the popup
 
-import allThemes from "~themes"
+import { allIcons } from "~icons"
 
-const STORAGE_KEY = "selectedThemeId"
+const STORAGE_KEY = "selectedIconId"
 
 function setIconFromStorage() {
   chrome.storage.local.get([STORAGE_KEY], (result) => {
-    const savedId = result[STORAGE_KEY];
-
-    const theme = allThemes.find((t) => t.id === savedId) ?? allThemes[0];
-
-    if (theme?.iconPath) {
-      chrome.action.setIcon({ path: theme.iconPath });
+    const savedId = result[STORAGE_KEY]
+    const icon = allIcons.find((i) => i.id === savedId) ?? allIcons[0]
+    if (icon?.assetPath) {
+      chrome.action.setIcon({ path: icon.assetPath })
     }
-
   })
 }
 
-// in case this gets refreshed in any way whatsoever
 chrome.runtime.onStartup.addListener(setIconFromStorage)
 chrome.runtime.onInstalled.addListener(setIconFromStorage)

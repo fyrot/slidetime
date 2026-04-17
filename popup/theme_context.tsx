@@ -46,11 +46,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   function setTheme(newTheme: PopupTheme) {
     setThemeState(newTheme)
     persistThemeId(newTheme.id)
-
-    if (newTheme.iconPath) {
-      chrome.action.setIcon({ path: newTheme.iconPath })
-    }
-    
   }
 
   return (

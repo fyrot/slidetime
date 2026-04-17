@@ -1,7 +1,7 @@
 {
   "name": "slidetime",
   "displayName": "Slidetime",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple extension that turns text phrases in Google Slides into live timers, countdowns, clocks, and more.",
   "author": "fyrot@outlook.com",
   "scripts": {

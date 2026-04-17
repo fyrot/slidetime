@@ -2,7 +2,6 @@
   "id": "green",
   "displayName": "Moss",
   "themeDisplayColor": "#6b9b7a",
-  "iconPath": "/assets/128/light-alt.png",
 
   "surface": {
     "base": "#f5f5f0",
