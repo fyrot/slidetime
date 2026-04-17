@@ -12,7 +12,7 @@ Slidetime is a lightweight browser extension that allows placeholder phrases to 
 `<<mm:ss+>>` | Displays a stopwatch starting from mm:ss    
 `<<~hh:mm>>` | Displays a countdown that reaches zero at hh:mm      
 `<<shorttime>>` | Displays the current time in the format hh:mm      
-`<<longtime>>` | Displays the current time and date (ex: Tuesday, April 14 at 11:05:00 PM)     
+`<<longtime>>` | Displays the current time with millisecond precision (hh:mm:ss.SSS)
 `<<shortdate>>` | Displays the current date, abbreviated (ex: Tue, Apr 14)     
 `<<longdate>>` | Displays the current date (ex: Tuesday, April 14, 2026)
 
