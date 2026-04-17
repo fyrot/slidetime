@@ -6,14 +6,14 @@
 
 Slidetime is a lightweight browser extension that allows placeholder phrases to be transformed into live timers, clocks, countdowns, and more in Google Slides presentations. To use it, simply place a text block anywhere on a given slide, input one of the placeholders below, and click present in order to view your timer in action.
 
-`<<time>>` | Displays the current time in the format hh:mm:ss
-`<<date>>` | Displays the current date in the format mm/dd/yyyy
-`<<mm:ss->>` | Displays a countdown to zero starting from mm:ss
-`<<mm:ss+>>` | Displays a stopwatch starting from mm:ss
-`<<~hh:mm>>` | Displays a countdown that reaches zero at hh:mm
-`<<shorttime>>` | Displays the current time in the format hh:mm 
-`<<longtime>>` | Displays the current time and date (ex: Tuesday, April 14 at 11:05:00 PM)
-`<<shortdate>>` | Displays the current date, abbreviated (ex: Tue, Apr 14)
+`<<time>>` | Displays the current time in the format hh:mm:ss     
+`<<date>>` | Displays the current date in the format mm/dd/yyyy    
+`<<mm:ss->>` | Displays a countdown to zero starting from mm:ss   
+`<<mm:ss+>>` | Displays a stopwatch starting from mm:ss    
+`<<~hh:mm>>` | Displays a countdown that reaches zero at hh:mm      
+`<<shorttime>>` | Displays the current time in the format hh:mm      
+`<<longtime>>` | Displays the current time and date (ex: Tuesday, April 14 at 11:05:00 PM)     
+`<<shortdate>>` | Displays the current date, abbreviated (ex: Tue, Apr 14)     
 `<<longdate>>` | Displays the current date (ex: Tuesday, April 14, 2026)
 
 ## Installation 
