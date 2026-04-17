@@ -64,7 +64,7 @@ export function parseTimerToken(tokenTxt: string) {
     case "date":       return parseTokenDate("date", flags);
     case "shortdate":  return parseTokenDate("shortdate", flags);
     case "longdate":   return parseTokenDate("longdate", flags);
-    case "datetime":    return parseTokenDate("datetime", flags);
+    case "datetime":   return parseTokenTime("datetime", flags);
   }
 
   return null;
@@ -84,7 +84,7 @@ export function buildTimerData(timerToken: ParsedTimerToken, tokenInd: number, s
 }
 
 // helper functions for parseToken
-function parseTokenTime(type: "time" | "shorttime" | "longtime", flags: TimerFlag[]) {
+function parseTokenTime(type: "time" | "shorttime" | "longtime" | "datetime" = "time", flags: TimerFlag[]) {
   const timerObj: ParsedTimerToken = {
     timerType: type,
     flags
@@ -119,7 +119,7 @@ function parseTokenStopwatch(minutesStr: string, secondsStr: string, flags: Time
   return timerObj;
 }
 
-function parseTokenDate(type: string = "date", flags: TimerFlag[]) {
+function parseTokenDate(type: "date" | "shortdate" | "longdate" = "date", flags: TimerFlag[]) {
   const timerObj: ParsedTimerToken = {
     timerType: type as TimerType,
     flags

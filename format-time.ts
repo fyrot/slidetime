@@ -43,14 +43,13 @@ export function formatTime(type: "time" | "shorttime" | "longtime" | "datetime" 
   const is24Hr = options["24hr"] ?? false;
   const currentDate = new Date();
   if (type === "shorttime") {
-    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit" });
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit" }); // 1:05 pm or 13:05
   } else if (type === "datetime") {
-    return currentDate.toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: !is24Hr });
+    return currentDate.toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: !is24Hr }); // Saturday, April 4, 2026, 1:05:09 PM or Saturday, April 4, 2026, 13:05:09
   } else if (type === "longtime") {
-    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
-  }
-  else {
-    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit" });
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 }); // 1:05:09.123 PM or 13:05:09.123
+  } else {
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit" }); // 1:05:09 PM or 13:05:09
   }
 }
 
@@ -119,10 +118,13 @@ export function formatStopwatch(timerState: TimerState, options: Record<string, 
 
 export function formatDate(type: "date" | "shortdate" | "longdate" = "date", options: Record<string, boolean> = {}):string {
   const currentDate = new Date();
-  if (type === "date") return currentDate.toLocaleDateString(); // 4/4/2026
-  else if (type === "shortdate") return currentDate.toLocaleDateString([], { weekday : "short", month: "short", day: "numeric", year: "numeric" }); // Sat, Apr 4, 2026
-  else if (type === "longdate") return currentDate.toLocaleDateString([], { weekday : "long", month: "long", day: "numeric", year: "numeric" }); // Saturday, April 4, 2026
-  else return currentDate.toLocaleDateString(); // 4/4/2026, but this DEFINITELY shouldn't happen
+  if (type === "shortdate") {
+    return currentDate.toLocaleDateString([], { weekday : "short", month: "short", day: "numeric", year: "numeric" }); // Sat, Apr 4, 2026
+  } else if (type === "longdate") {
+    return currentDate.toLocaleDateString([], { weekday : "long", month: "long", day: "numeric", year: "numeric" }); // Saturday, April 4, 2026
+  } else {
+    return currentDate.toLocaleDateString(); // 4/4/2026
+  }
 }
 
 // helper functions below
