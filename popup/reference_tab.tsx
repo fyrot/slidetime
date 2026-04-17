@@ -33,7 +33,7 @@ const referenceCards: CommandReference[] = [
   },
   {
     command: "<<longtime>>",
-    description: "Displays the current time & date",
+    description: "Displays the current time with millisecond precision",
   },
   {
     command: "<<shortdate>>",

@@ -119,7 +119,7 @@ export function formatStopwatch(timerState: TimerState, options: Record<string, 
 export function formatDate(type: "date" | "shortdate" | "longdate" = "date", options: Record<string, boolean> = {}):string {
   const currentDate = new Date();
   if (type === "shortdate") {
-    return currentDate.toLocaleDateString([], { weekday : "short", month: "short", day: "numeric", year: "numeric" }); // Sat, Apr 4, 2026
+    return currentDate.toLocaleDateString([], { weekday : "short", month: "short", day: "numeric"}); // Sat, Apr 4
   } else if (type === "longdate") {
     return currentDate.toLocaleDateString([], { weekday : "long", month: "long", day: "numeric", year: "numeric" }); // Saturday, April 4, 2026
   } else {
