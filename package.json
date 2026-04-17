@@ -1,9 +1,9 @@
 {
-  "name": "gfn-timer",
-  "displayName": "GFN Timer",
-  "version": "0.0.1",
-  "description": "A simple timer/stopwatch extension for Google Slides presentations.",
-  "author": "example@test.com",
+  "name": "slidetime",
+  "displayName": "Slidetime",
+  "version": "1.0.0",
+  "description": "A simple extension that turns text phrases in Google Slides into live timers, countdowns, clocks, and more.",
+  "author": "fyrot@outlook.com",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",

@@ -24,12 +24,12 @@ const referenceCards: CommandReference[] = [
     description: "Displays a stopwatch that starts at mm:ss",
   },
   {
-    command: "<<shorttime>>",
-    description: "Displays the current time (hh:mm pm/am)",
-  },
-  {
     command: "<<~hh:mm>>",
     description: "Displays a countdown that reaches 0:00 at hh:mm",
+  },
+  {
+    command: "<<shorttime>>",
+    description: "Displays the current time (hh:mm pm/am)",
   },
   {
     command: "<<longtime>>",

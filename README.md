@@ -1,33 +1,27 @@
-This is a [Plasmo extension](https://docs.plasmo.com/) project bootstrapped with [`plasmo init`](https://www.npmjs.com/package/plasmo).
+# Slidetime
 
-## Getting Started
+[![Get it on the Chrome Web Store](https://developer.chrome.com/static/docs/webstore/branding/image/UV4C4ybeBTsZt43U4xis.png)](https://chromewebstore.google.com/detail/slidetime/ogmlodhmcglfnaphcgojbobkadlbomji)
 
-First, run the development server:
+## What is it?
 
-```bash
-pnpm dev
-# or
-npm run dev
-```
+Slidetime is a lightweight browser extension that allows placeholder phrases to be transformed into live timers, clocks, countdowns, and more in Google Slides presentations. To use it, simply place a text block anywhere on a given slide, input one of the placeholders below, and click present in order to view your timer in action.
 
-Open your browser and load the appropriate development build. For example, if you are developing for the chrome browser, using manifest v3, use: `build/chrome-mv3-dev`.
+`<<time>>` | Displays the current time in the format hh:mm:ss
+`<<date>>` | Displays the current date in the format mm/dd/yyyy
+`<<mm:ss->>` | Displays a countdown to zero starting from mm:ss
+`<<mm:ss+>>` | Displays a stopwatch starting from mm:ss
+`<<~hh:mm>>` | Displays a countdown that reaches zero at hh:mm
+`<<shorttime>>` | Displays the current time in the format hh:mm 
+`<<longtime>>` | Displays the current time and date (ex: Tuesday, April 14 at 11:05:00 PM)
+`<<shortdate>>` | Displays the current date, abbreviated (ex: Tue, Apr 14)
+`<<longdate>>` | Displays the current date (ex: Tuesday, April 14, 2026)
 
-You can start editing the popup by modifying `popup.tsx`. It should auto-update as you make changes. To add an options page, simply add a `options.tsx` file to the root of the project, with a react component default exported. Likewise to add a content page, add a `content.ts` file to the root of the project, importing some module and do some logic, then reload the extension on your browser.
+## Installation 
 
-For further guidance, [visit our Documentation](https://docs.plasmo.com/)
+You can find this project on the Chrome Web Store, where you can add it to your browser.
 
-## Making production build
+Alternatively, you can `git clone` this repository and run `npm run build` in the project directory in order to create a production-ready build. From there, go to `chrome://extensions`, enable developer mode, and select the built folder. We recommend installing via your browser’s extension store for the added convenience of passively receiving updates with all the new features the Slidetime team has planned. 
 
-Run the following:
+## Feedback
 
-```bash
-pnpm build
-# or
-npm run build
-```
-
-This should create a production bundle for your extension, ready to be zipped and published to the stores.
-
-## Submit to the webstores
-
-The easiest way to deploy your Plasmo extension is to use the built-in [bpp](https://bpp.browser.market) GitHub action. Prior to using this action however, make sure to build your extension and upload the first version to the store to establish the basic credentials. Then, simply follow [this setup instruction](https://docs.plasmo.com/framework/workflows/submit) and you should be on your way for automated submission!
+We’re always looking forward to including new features to make the extension more helpful! Any feedback is appreciated and goes a long way in figuring out how to improve the Slidetime experience. 
