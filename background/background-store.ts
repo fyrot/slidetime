@@ -1,4 +1,4 @@
-import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
+import { TimerMessage, TimerFlag, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
 import { debugLog } from "~utils/debug-options";
 
 // basically a universal source of truth for the other applications that should be accurate
@@ -87,13 +87,17 @@ function verifyActiveTimers(session: SlidesSession) {
     const shouldBeEnabled = (timer.slideId === session.activeSlideId);
     // detecting incongruity between shouldbeenabled and what is stored for determine logic
     if (shouldBeEnabled && !timer.enabled) {
-      // resuming -> start the clock (again?)
+      // resuming -> start the clock
       timer.startedAt = Date.now();
     } else if (!shouldBeEnabled && timer.enabled) {
       // pausing -> bank the elapsed time, reset startedAt
       if (timer.startedAt) {
         timer.accumulatedMs += Date.now() - timer.startedAt;
         timer.startedAt = null;
+      }
+      // reset on exit so next visit starts from zero immediately
+      if (timer.flags?.includes(TimerFlag.RESET_ON_SLIDE)) {
+        timer.accumulatedMs = 0;
       }
     }
 

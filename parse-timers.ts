@@ -42,6 +42,20 @@ export function parseTimerToken(tokenTxt: string) {
     }
   }
 
+  if (lastChar === "p") {
+    const secondToLastChar = timerExpr[timerExpr.length - 2];
+    const timeStr = timerExpr.slice(0, -2);
+    const timeMatch = timeStr.match(/^(\d+):(\d{2})$/);
+    if (!timeMatch) { return null; }
+    if (secondToLastChar === "+") {
+      return parseTokenPerpetual(timeMatch[1], timeMatch[2], false, flags);
+    }
+    if (secondToLastChar === "-") {
+      return parseTokenPerpetual(timeMatch[1], timeMatch[2], true, flags);
+    }
+      
+  }
+
   // keyword timers
   switch (timerExpr) {
     case "time":       return parseTokenTime("time", flags);
@@ -50,6 +64,7 @@ export function parseTimerToken(tokenTxt: string) {
     case "date":       return parseTokenDate("date", flags);
     case "shortdate":  return parseTokenDate("shortdate", flags);
     case "longdate":   return parseTokenDate("longdate", flags);
+    case "datetime":    return parseTokenDate("datetime", flags);
   }
 
   return null;
@@ -110,6 +125,19 @@ function parseTokenDate(type: string = "date", flags: TimerFlag[]) {
     flags
   };
   return timerObj;
+}
+
+function parseTokenPerpetual(minutesStr: string, secondsStr: string, isCountdown: boolean = false, flags: TimerFlag[]) {
+  const minutes = parseInt(minutesStr ?? "0");
+  const seconds = parseInt(secondsStr ?? "0");
+  const totalSeconds = minutes * 60 + seconds;
+  const nowEpoch = Math.floor(Date.now() / 1000);
+
+  if (isCountdown) {
+    return { timerType: "perpetualcountdown" as const, duration: nowEpoch + totalSeconds, flags };
+  } else {
+    return { timerType: "perpetualstopwatch" as const, duration: nowEpoch - totalSeconds, flags };
+  }
 }
 
 // TODO: allow the countdown to include hours as well, but most tests should be less than an hour

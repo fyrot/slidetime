@@ -24,23 +24,32 @@ export function formatTimer(timerState: TimerState, options: Record<string, bool
       return formatStopwatch(timerState, mergedOptions);
     case "timeto":
       return formatTimeTo(timerState, mergedOptions);
+    case "perpetualcountdown":
+      return formatPerpetualCountdown(timerState, mergedOptions);
+    case "perpetualstopwatch":
+      return formatPerpetualStopwatch(timerState, mergedOptions);
     case "date":
       return formatDate("date", mergedOptions);
     case "shortdate":
       return formatDate("shortdate", mergedOptions);
     case "longdate":
       return formatDate("longdate", mergedOptions);
+    case "datetime":
+      return formatTime("datetime", mergedOptions);
   }
 }
 
-export function formatTime(type: "time" | "shorttime" | "longtime" = "time", options: Record<string, boolean> = {}):string {
+export function formatTime(type: "time" | "shorttime" | "longtime" | "datetime" = "time", options: Record<string, boolean> = {}):string {
   const is24Hr = options["24hr"] ?? false;
   const currentDate = new Date();
   if (type === "shorttime") {
     return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit" });
-  } else if (type === "longtime") {
+  } else if (type === "datetime") {
     return currentDate.toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: !is24Hr });
-  } else {
+  } else if (type === "longtime") {
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
+  }
+  else {
     return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit" });
   }
 }
@@ -55,6 +64,26 @@ export function formatTimeTo(timerState: TimerState, options: Record<string, boo
   const hours = Math.floor(remaining / 3600);
   const minutes = Math.floor((remaining % 3600) / 60);
   const seconds = remaining % 60;
+  if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
+  return `${minutes}:${padTwoZeros(seconds)}`;
+}
+
+export function formatPerpetualCountdown(timerState: TimerState, options: Record<string, boolean> = {}): string {
+  // immune to slide navigation
+  const remaining = Math.max(Math.ceil((timerState.duration ?? 0) - Date.now() / 1000), 0);
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  const seconds = remaining % 60;
+  if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
+  return `${minutes}:${padTwoZeros(seconds)}`;
+}
+
+export function formatPerpetualStopwatch(timerState: TimerState, options: Record<string, boolean> = {}): string {
+  // immune to slide navigation
+  const elapsed = Math.max(Math.floor(Date.now() / 1000 - (timerState.duration ?? 0)), 0);
+  const hours = Math.floor(elapsed / 3600);
+  const minutes = Math.floor((elapsed % 3600) / 60);
+  const seconds = elapsed % 60;
   if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
   return `${minutes}:${padTwoZeros(seconds)}`;
 }

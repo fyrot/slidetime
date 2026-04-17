@@ -6,11 +6,12 @@ export enum TimerMessage {
   HEART_BEAT = "HEART_BEAT"
 }
 
-export type TimerType = "time" | "shorttime" | "longtime" | "countdown" | "stopwatch" | "timeto" | "date" | "shortdate" | "longdate"
+export type TimerType = "time" | "shorttime" | "longtime" | "countdown" | "stopwatch" | "timeto" | "perpetualcountdown" | "perpetualstopwatch" | "date" | "shortdate" | "longdate" | "datetime"
 
 
 export enum TimerFlag {
   HR24 = "24hr",
+  RESET_ON_SLIDE = "reset",
 }
 
 export interface TimerData {
