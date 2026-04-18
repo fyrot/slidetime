@@ -18,10 +18,14 @@ Slidetime is a lightweight browser extension that allows placeholder phrases to 
 
 ## Installation 
 
-You can find this project on the Chrome Web Store, where you can add it to your browser.
+You can find this project on the [Chrome Web Store](https://chromewebstore.google.com/detail/slidetime/ogmlodhmcglfnaphcgojbobkadlbomji), where you can add it to your browser.
+
+We are currently in the process of creating a build and listing for this extension as a Firefox addon. When it is ready, this page will be updated to reflect that. 
 
 Alternatively, you can `git clone` this repository and run `npm run build` in the project directory in order to create a production-ready build. From there, go to `chrome://extensions`, enable developer mode, and select the built folder. We recommend installing via your browser’s extension store for the added convenience of passively receiving updates with all the new features the Slidetime team has planned. 
 
 ## Feedback
 
 We’re always looking forward to including new features to make the extension more helpful! Any feedback is appreciated and goes a long way in figuring out how to improve the Slidetime experience. 
+
+Feel free to leave a review on our Chrome Web Store listing or open up a feature request over here. 

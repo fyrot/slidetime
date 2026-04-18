@@ -60,6 +60,9 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
     case TimerMessage.RESET_SESSION:
       handleResetSession(currentSession);
       break;
+    case TimerMessage.TOGGLE_SLIDE_PAUSE:
+      handleToggleSlidePause(currentSession);
+      break;
   }
 }
 
@@ -71,6 +74,7 @@ function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
       session.timerStateRecord[timer.id] = {
         ...timer,
         enabled: false,
+        paused: false,
         startedAt: null,
         accumulatedMs: 0
       };
@@ -83,26 +87,49 @@ function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
 
 function verifyActiveTimers(session: SlidesSession) {
   for (const timer of Object.values(session.timerStateRecord)) {
-    
-    const shouldBeEnabled = (timer.slideId === session.activeSlideId);
-    // detecting incongruity between shouldbeenabled and what is stored for determine logic
-    if (shouldBeEnabled && !timer.enabled) {
-      // resuming -> start the clock
+
+    const isActiveSlide = (timer.slideId === session.activeSlideId);
+    const shouldBeRunning = isActiveSlide && !timer.paused;
+    const wasRunning = timer.startedAt != null;
+
+    // the running to not-running transition owns the bank/unbank of timer start data
+    if (shouldBeRunning && !wasRunning) {
       timer.startedAt = Date.now();
-    } else if (!shouldBeEnabled && timer.enabled) {
-      // pausing -> bank the elapsed time, reset startedAt
-      if (timer.startedAt) {
-        timer.accumulatedMs += Date.now() - timer.startedAt;
-        timer.startedAt = null;
-      }
-      // reset on exit so next visit starts from zero immediately
-      if (timer.flags?.includes(TimerFlag.RESET_ON_SLIDE)) {
-        timer.accumulatedMs = 0;
-      }
+    } else if (!shouldBeRunning && wasRunning) {
+      timer.accumulatedMs += Date.now() - (timer.startedAt as number);
+      timer.startedAt = null;
     }
 
-    timer.enabled = shouldBeEnabled;
+    // reset-on-slide only applies when leaving the slide, not when pausing on it
+    // NOTE: this is currently undocumented in the reference
+    if (!isActiveSlide && timer.enabled && timer.flags?.includes(TimerFlag.RESET_ON_SLIDE)) {
+      timer.accumulatedMs = 0;
+    }
+
+    timer.enabled = isActiveSlide;
   }
+}
+
+function handleToggleSlidePause(session: SlidesSession) {
+  const targets = Object.values(session.timerStateRecord).filter(
+    (t) =>
+      t.slideId === session.activeSlideId &&
+      (t.timerType === "countdown" || t.timerType === "stopwatch")
+  );
+  if (targets.length === 0) { return; }
+
+  // if any targeted timer is currently running, pause all; else resume all
+  const anyRunning = targets.some((t) => !t.paused);
+  const nextPaused = anyRunning;
+
+  for (const timer of targets) {
+    timer.paused = nextPaused;
+  }
+
+  verifyActiveTimers(session);
+
+  // push fresh state so render reflects the toggle without waiting on the 5s sync heartbeat interval we already have set up
+  handleGetTimerStates(session);
 }
 
 function handleSlideChanged(session: SlidesSession, newSlideId: string) {

@@ -2,6 +2,9 @@
 
 import type { TimerState } from "~timer-types";
 
+const PAUSE_ICON = "⏸"
+const PLAY_ICON = "▶"
+
 // note for later: add some type of array or set to timer state where we can store and reference "format flags"
 
 export function formatTimer(timerState: TimerState, options: Record<string, boolean> = {}):string {
@@ -100,8 +103,12 @@ export function formatCountdown(timerState: TimerState, options: Record<string, 
   const hours = Math.floor(remaining / 3600);
   const minutes = Math.floor((remaining % 3600) / 60);
   const seconds = remaining % 60;
-  if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
-  return `${minutes}:${padTwoZeros(seconds)}`;
+  const base = hours > 0
+    ? `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`
+    : `${minutes}:${padTwoZeros(seconds)}`;
+
+
+  return appendPauseIndicator(base, timerState, options);
 }
 
 export function formatStopwatch(timerState: TimerState, options: Record<string, boolean> = {}):string {
@@ -112,8 +119,16 @@ export function formatStopwatch(timerState: TimerState, options: Record<string, 
   const hours = Math.floor(totalRaw / 3600);
   const minutes = Math.floor((totalRaw % 3600) / 60);
   const seconds = totalRaw % 60;
-  if (hours > 0) return `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`;
-  return `${minutes}:${padTwoZeros(seconds)}`;
+  const base = hours > 0
+    ? `${hours}:${padTwoZeros(minutes)}:${padTwoZeros(seconds)}`
+    : `${minutes}:${padTwoZeros(seconds)}`;
+
+  return appendPauseIndicator(base, timerState, options);
+}
+
+function appendPauseIndicator(base: string, timerState: TimerState, options: Record<string, boolean>): string {
+  if (!options.pausePlayTimers) { return base; }
+  return timerState.paused ? `${base} ${PLAY_ICON}` : `${base} ${PAUSE_ICON}`;
 }
 
 export function formatDate(type: "date" | "shortdate" | "longdate" = "date", options: Record<string, boolean> = {}):string {

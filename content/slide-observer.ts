@@ -26,6 +26,8 @@ const PRESENT_MODE_QUERY = ".sketchyViewerContainer";
 const PRESENT_MODE_CONTAINER = ".punch-full-screen-element";
 const SLIDE_WRAPPER_QUERY = ".punch-viewer-page-wrapper"; // keeping for potential future use
 
+const PAUSE_PLAY_KEY = "y";
+
 let currentSlideId = "";
 let inPresentMode = false;
 let presentDocument: Document | null = null;
@@ -35,6 +37,8 @@ let slideCheckInterval: number | null = null;
 let stateSyncInterval: number | null = null;
 let renderLoopId: number | null = null;
 let cachedTimerStates: TimerStates | null = null;
+
+
 
 
 let currentOptions: Record<string, boolean> = {};
@@ -50,6 +54,14 @@ chrome.storage.local.get(["timerOptionStates"], (result) => {
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === "local" && changes.timerOptionStates) {
     currentOptions = changes.timerOptionStates.newValue;
+    // sync the pause/play keybind listener with the setting while presenting
+    if (inPresentMode) {
+      if (currentOptions?.pausePlayTimers) {
+        attachPauseListener();
+      } else {
+        detachPauseListener();
+      }
+    }
   }
 });
 
@@ -119,11 +131,20 @@ function enterPresentMode() {
   if (!renderLoopId) {
     renderLoopId = requestAnimationFrame(renderLoop);
   }
+
+  // only attach the listener if the pause/play setting is on
+  if (currentOptions?.pausePlayTimers) {
+    attachPauseListener();
+  }
+
 }
 
 function exitPresentMode() {
   inPresentMode = false;
   currentSlideId = "";
+
+  // always detach the keybind on exit, regardless of setting, presence will be handled in detach function
+  detachPauseListener();
 
   // reset cached states
   cachedTimerStates = null;
@@ -271,6 +292,11 @@ function checkSlideChange() {
     const doc = getPresentDocument();
     if (!doc) { return; }
 
+    // iframe is ready — retry pause listener attach if the setting is on and it wasn't attached at enter time
+    if (currentOptions?.pausePlayTimers) {
+      attachPauseListener();
+    }
+
     debugLog("trying..")
     if (onSlideChanged()) {
       debugLog("onslidechanged hit");
@@ -286,6 +312,46 @@ function checkSlideChange() {
     
   }
 }
+
+// pause/play functionality, toggles all timers (type countdown or stopwatch) on the current slide.
+// keydown focus lives inside the present-mode iframe
+// that doc materializes lazily, so we rely on check slide change in order to add it 
+let pauseListenerDoc: Document | null = null;
+
+function onPauseKeydown(e: KeyboardEvent) {
+  debugLog("GFN Timer: Got key press! " + e.key.toLowerCase())
+  if (e.key.toLowerCase() !== PAUSE_PLAY_KEY) { return; }
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) { return; }
+
+  // redundant check because it will only be registered in present mode
+  if (!inPresentMode) { return; }
+
+  // toggle logic is handled in background store
+  const messageContent: TimerMessaging = { messageType: TimerMessage.TOGGLE_SLIDE_PAUSE };
+  port.postMessage(messageContent);
+}
+
+function attachPauseListener() {
+  const doc = getPresentDocument();
+  if (!doc) { return; } // iframe not ready yet; a later checkSlideChange will retry
+  if (pauseListenerDoc === doc) { return; } // already attached to this doc
+
+  // clean up old listener if it exists
+  if (pauseListenerDoc) {
+    pauseListenerDoc.removeEventListener("keydown", onPauseKeydown);
+  }
+
+  doc.addEventListener("keydown", onPauseKeydown);
+  pauseListenerDoc = doc;
+}
+
+function detachPauseListener() {
+  if (!pauseListenerDoc) { return; }
+  pauseListenerDoc.removeEventListener("keydown", onPauseKeydown);
+  pauseListenerDoc = null;
+}
+
+
 
 // used for the autoadvance feature
 function advanceSlide() {

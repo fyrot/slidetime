@@ -1,4 +1,4 @@
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 export function debugLog(text: string) {
   if (!DEBUG_MODE) { return; }

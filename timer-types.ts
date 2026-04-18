@@ -3,7 +3,8 @@ export enum TimerMessage {
   REGISTER_TIMERS = "REGISTER_TIMERS",
   GET_TIMER_STATES = "GET_TIMER_STATES",
   RESET_SESSION = "RESET_SESSION",
-  HEART_BEAT = "HEART_BEAT"
+  HEART_BEAT = "HEART_BEAT",
+  TOGGLE_SLIDE_PAUSE = "TOGGLE_SLIDE_PAUSE"
 }
 
 export type TimerType = "time" | "shorttime" | "longtime" | "countdown" | "stopwatch" | "timeto" | "perpetualcountdown" | "perpetualstopwatch" | "date" | "shortdate" | "longdate" | "datetime"
@@ -25,6 +26,7 @@ export interface TimerData {
 
 export interface TimerState extends TimerData {
   enabled: boolean
+  paused: boolean
   startedAt: number | null
   accumulatedMs: number
 }
@@ -59,12 +61,17 @@ export interface HeartbeatMessage {
   messageType: TimerMessage.HEART_BEAT
 }
 
-export type TimerMessaging = 
-  | SlideChangedMessage 
-  | RegisterTimersMessage 
-  | GetTimerStatesMessage 
-  | ResetSessionMessage 
+export interface ToggleSlidePauseMessage {
+  messageType: TimerMessage.TOGGLE_SLIDE_PAUSE
+}
+
+export type TimerMessaging =
+  | SlideChangedMessage
+  | RegisterTimersMessage
+  | GetTimerStatesMessage
+  | ResetSessionMessage
   | HeartbeatMessage
+  | ToggleSlidePauseMessage
 
 // union ^ pretty sure that's what that's called
 
