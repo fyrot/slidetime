@@ -1,4 +1,4 @@
-import { TimerMessage, TimerFlag, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
+import { TimerMessage, TimerFlagType, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
 import { debugLog } from "~utils/debug-options";
 
 // basically a universal source of truth for the other applications that should be accurate
@@ -102,7 +102,7 @@ function verifyActiveTimers(session: SlidesSession) {
 
     // reset-on-slide only applies when leaving the slide, not when pausing on it
     // NOTE: this is currently undocumented in the reference
-    if (!isActiveSlide && timer.enabled && timer.flags?.includes(TimerFlag.RESET_ON_SLIDE)) {
+    if (!isActiveSlide && timer.enabled && timer.flags?.some(f => f.type === TimerFlagType.RESET_ON_SLIDE)) {
       timer.accumulatedMs = 0;
     }
 

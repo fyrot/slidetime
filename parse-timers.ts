@@ -1,5 +1,5 @@
-import { TimerFlag } from "~timer-types";
-import type { TimerData, TimerType } from "~timer-types";
+import { TimerFlagType } from "~timer-types";
+import type { AppliedFlag, TimerData, TimerType } from "~timer-types";
 
 // Format: <<timerExpr>> or <<timerExpr|flag1&flag2&flag3>>
 // timerExpr is one of:
@@ -11,7 +11,16 @@ const TIMER_REGEX = /^<<([^|>]+?)(?:\|([^>]*))?>>$/;
 export interface ParsedTimerToken {
   timerType: TimerType
   duration?: number
-  flags?: TimerFlag[]
+  flags?: AppliedFlag[]
+}
+
+
+function parseFlag(flagStr: string): AppliedFlag | null {
+  switch (flagStr) {
+    case TimerFlagType.HR24: return { type: TimerFlagType.HR24 };
+    case TimerFlagType.RESET_ON_SLIDE: return { type: TimerFlagType.RESET_ON_SLIDE };
+    default: return null;
+  }
 }
 
 export function parseTimerToken(tokenTxt: string) {
@@ -19,9 +28,8 @@ export function parseTimerToken(tokenTxt: string) {
   if (!matches) { return null; }
 
   const timerExpr = matches[1];
-  const knownFlagValues = new Set<string>(Object.values(TimerFlag));
-  const flags: TimerFlag[] = matches[2]
-    ? matches[2].split("&").map(f => f.trim()).filter((f): f is TimerFlag => knownFlagValues.has(f))
+  const flags: AppliedFlag[] = matches[2]
+    ? matches[2].split("&").map(f => f.trim()).map(parseFlag).filter((f): f is AppliedFlag => f !== null)
     : [];
 
   // ~HH:MM → timeto (countdown to next occurrence of that time)
@@ -84,7 +92,7 @@ export function buildTimerData(timerToken: ParsedTimerToken, tokenInd: number, s
 }
 
 // helper functions for parseToken
-function parseTokenTime(type: "time" | "shorttime" | "longtime" | "datetime" = "time", flags: TimerFlag[]) {
+function parseTokenTime(type: "time" | "shorttime" | "longtime" | "datetime" = "time", flags: AppliedFlag[]) {
   const timerObj: ParsedTimerToken = {
     timerType: type,
     flags
@@ -93,7 +101,7 @@ function parseTokenTime(type: "time" | "shorttime" | "longtime" | "datetime" = "
 }
 
 // TODO: allow countdown and stopwatch to include hours as well
-function parseTokenCountdown(minutesStr: string, secondsStr: string, flags: TimerFlag[]) {
+function parseTokenCountdown(minutesStr: string, secondsStr: string, flags: AppliedFlag[]) {
   const minutes = parseInt(minutesStr ?? "0");
   const seconds = parseInt(secondsStr ?? "0");
   const totalSeconds = minutes * 60 + seconds;
@@ -106,7 +114,7 @@ function parseTokenCountdown(minutesStr: string, secondsStr: string, flags: Time
   return timerObj;
 }
 
-function parseTokenStopwatch(minutesStr: string, secondsStr: string, flags: TimerFlag[]) {
+function parseTokenStopwatch(minutesStr: string, secondsStr: string, flags: AppliedFlag[]) {
   const minutes = parseInt(minutesStr ?? "0");
   const seconds = parseInt(secondsStr ?? "0");
   const totalSeconds = minutes * 60 + seconds;
@@ -119,7 +127,7 @@ function parseTokenStopwatch(minutesStr: string, secondsStr: string, flags: Time
   return timerObj;
 }
 
-function parseTokenDate(type: "date" | "shortdate" | "longdate" = "date", flags: TimerFlag[]) {
+function parseTokenDate(type: "date" | "shortdate" | "longdate" = "date", flags: AppliedFlag[]) {
   const timerObj: ParsedTimerToken = {
     timerType: type as TimerType,
     flags
@@ -127,7 +135,7 @@ function parseTokenDate(type: "date" | "shortdate" | "longdate" = "date", flags:
   return timerObj;
 }
 
-function parseTokenPerpetual(minutesStr: string, secondsStr: string, isCountdown: boolean = false, flags: TimerFlag[]) {
+function parseTokenPerpetual(minutesStr: string, secondsStr: string, isCountdown: boolean = false, flags: AppliedFlag[]) {
   const minutes = parseInt(minutesStr ?? "0");
   const seconds = parseInt(secondsStr ?? "0");
   const totalSeconds = minutes * 60 + seconds;
@@ -141,7 +149,7 @@ function parseTokenPerpetual(minutesStr: string, secondsStr: string, isCountdown
 }
 
 // TODO: allow the countdown to include hours as well, but most tests should be less than an hour
-function parseTokenTimeTo(timeStr: string, flags: TimerFlag[]) {
+function parseTokenTimeTo(timeStr: string, flags: AppliedFlag[]) {
   const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
   if (!timeMatch) { return null; }
 

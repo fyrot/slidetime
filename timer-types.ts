@@ -9,11 +9,15 @@ export enum TimerMessage {
 
 export type TimerType = "time" | "shorttime" | "longtime" | "countdown" | "stopwatch" | "timeto" | "perpetualcountdown" | "perpetualstopwatch" | "date" | "shortdate" | "longdate" | "datetime"
 
-
-export enum TimerFlag {
+// formerly timerflag, renamed to be more specific as flags plan to have values associated with them
+export enum TimerFlagType {
   HR24 = "24hr",
   RESET_ON_SLIDE = "reset",
 }
+
+export type AppliedFlag =
+  | { type: TimerFlagType.HR24 }
+  | { type: TimerFlagType.RESET_ON_SLIDE }
 
 export interface TimerData {
   id: string
@@ -21,7 +25,7 @@ export interface TimerData {
   slideId: string // google presents the slide id in the url "hash"
 
   duration?: number
-  flags?: TimerFlag[]
+  flags?: AppliedFlag[]
 }
 
 export interface TimerState extends TimerData {

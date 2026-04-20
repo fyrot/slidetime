@@ -11,7 +11,7 @@ export function formatTimer(timerState: TimerState, options: Record<string, bool
   // merge per-timer flags on top of global options (per-timer flags take precedence)
   const mergedOptions: Record<string, boolean> = { ...options };
   for (const flag of timerState.flags ?? []) {
-    mergedOptions[flag] = true;
+    mergedOptions[flag.type] = true;
   }
 
   switch (timerState.timerType) {
