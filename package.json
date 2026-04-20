@@ -37,7 +37,7 @@
     ],
     "web_accessible_resources": [
       {
-        "resources": ["assets/icon-light.png", "assets/icon-dark.png", "assets/128/light-alt.png", "assets/128/dark-alt.png"],
+        "resources": ["assets/icon-light.png", "assets/icon-dark.png", "assets/128/light-alt.png", "assets/128/dark-alt.png", "assets/alarm.ogg"],
         "matches": ["<all_urls>"]
       }
     ]

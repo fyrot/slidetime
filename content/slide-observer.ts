@@ -21,6 +21,7 @@ const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
 
 const timerElmRecord: Record<string, SVGTextElement[]> = {};
 const firedSet = new Set<string>();
+const soundFiredSet = new Set<string>();
 
 const PORT_NAME = "gfn-timer";
 const SLIDE_ID_REGEX = /slide=([^&]+)/;
@@ -152,6 +153,7 @@ function exitPresentMode() {
   // reset cached states
   cachedTimerStates = null;
   firedSet.clear();
+  soundFiredSet.clear();
 
   // clear stale element and document references so re-entering present mode rescans
   for (const key of Object.keys(timerElmRecord)) {
@@ -370,6 +372,36 @@ function advanceSlide() {
   wrapper.click();
 }
 
+function playZeroSound() {
+  const audio = new Audio(chrome.runtime.getURL("assets/alarm.ogg"));
+  audio.volume = 0.8;
+  audio.play();
+}
+
+function checkZeroSound(timerState: TimerState) {
+  if (!currentOptions["countdownSound"]) return;
+  if (soundFiredSet.has(timerState.id))  return;
+
+
+  let finished = false;
+  const type = timerState.timerType;
+
+  if (type === "countdown") {
+    const elapsedMs = getElapsedMs(timerState);
+    const remainingSec = (timerState.duration ?? 0) - Math.floor(elapsedMs / 1000);
+    finished = remainingSec <= 0;
+  } 
+  else if (type === "timeto" || type === "perpetualcountdown") {
+    const remaining = Math.ceil((timerState.duration ?? 0) - Date.now() / 1000);
+    finished = remaining <= 0;
+  }
+
+  if (finished) {
+    soundFiredSet.add(timerState.id);
+    playZeroSound();
+  }
+}
+
 function checkAutoAdvance(timerState: TimerState) {
   if (!currentOptions["countdownAdvance"]) { return; }
   if (timerState.timerType !== "countdown") { return; }
@@ -400,6 +432,7 @@ function renderLoop() {
         nodeRef.textContent = formatted;
       }
       checkAutoAdvance(timerState);
+      checkZeroSound(timerState);
     }
   }
 
