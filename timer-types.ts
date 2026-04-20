@@ -13,16 +13,18 @@ export type TimerType = "time" | "shorttime" | "longtime" | "countdown" | "stopw
 export enum TimerFlagType {
   HR24 = "24hr",
   RESET_ON_SLIDE = "reset",
+  ID = "id",
 }
 
 export type AppliedFlag =
   | { type: TimerFlagType.HR24 }
   | { type: TimerFlagType.RESET_ON_SLIDE }
+  | { type: TimerFlagType.ID; value: string }
 
 export interface TimerData {
   id: string
   timerType: TimerType
-  slideId: string // google presents the slide id in the url "hash"
+  slideIds: string[] // google presents the slide id in the url "hash"
 
   duration?: number
   flags?: AppliedFlag[]

@@ -4,7 +4,7 @@ import { debugLog } from "~utils/debug-options";
 // basically a universal source of truth for the other applications that should be accurate
 // NEW: now does not update elapsed time, rather acts as a db for the content scripts
 
-// move this interface to its own file
+// move this interface to its own file later
 interface SlidesSession {
   port: chrome.runtime.Port // we open up a listener with each slides port
   activeSlideId: string,
@@ -79,6 +79,13 @@ function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
         accumulatedMs: 0
       };
       debugLog("Registered new timer");
+    } else {
+      // if already present, across all stored records include this new slide id as a "home"
+      for (const slideId of timer.slideIds) {
+        if (!session.timerStateRecord[timer.id].slideIds.includes(slideId)) {
+          session.timerStateRecord[timer.id].slideIds.push(slideId);
+        }
+      }
     }
   }
   debugLog("-- (Registered) -- ");
@@ -88,7 +95,7 @@ function handleRegisterTimers(session: SlidesSession, timers: TimerData[]) {
 function verifyActiveTimers(session: SlidesSession) {
   for (const timer of Object.values(session.timerStateRecord)) {
 
-    const isActiveSlide = (timer.slideId === session.activeSlideId);
+    const isActiveSlide = timer.slideIds.includes(session.activeSlideId);
     const shouldBeRunning = isActiveSlide && !timer.paused;
     const wasRunning = timer.startedAt != null;
 
@@ -113,7 +120,7 @@ function verifyActiveTimers(session: SlidesSession) {
 function handleToggleSlidePause(session: SlidesSession) {
   const targets = Object.values(session.timerStateRecord).filter(
     (t) =>
-      t.slideId === session.activeSlideId &&
+      t.slideIds.includes(session.activeSlideId) &&
       (t.timerType === "countdown" || t.timerType === "stopwatch")
   );
   if (targets.length === 0) { return; }

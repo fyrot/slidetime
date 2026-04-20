@@ -7,12 +7,13 @@ All items listed *underneath* a version header are associated with that version 
 
 ### Added
 
-- 
+- New ability to specify the ID of a timer via the "id=blah" flag. This enables timers on separate slides to share the same if configured to identical ids. For example, two stopwatches on two separate slides would reflect the same time and have increases reflected on both. 
 
 ### Changed
 
--
 - Internal: flags are now distinguished by an array of applied flags
+- Internal: applied flags now can carry values other than booleans 
+- Internal: slide IDs are stored as an array to allow timers to update on multiple slides 
 
 ## 1.0.2 
 

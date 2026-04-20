@@ -16,6 +16,12 @@ export interface ParsedTimerToken {
 
 
 function parseFlag(flagStr: string): AppliedFlag | null {
+  if (flagStr.startsWith("id=")) {
+    const value = flagStr.slice(3);
+    const flag = { type: TimerFlagType.ID, value: value };
+    return value.length > 0 ? flag : null;
+  }
+
   switch (flagStr) {
     case TimerFlagType.HR24: return { type: TimerFlagType.HR24 };
     case TimerFlagType.RESET_ON_SLIDE: return { type: TimerFlagType.RESET_ON_SLIDE };
@@ -79,11 +85,12 @@ export function parseTimerToken(tokenTxt: string) {
 }
 
 export function buildTimerData(timerToken: ParsedTimerToken, tokenInd: number, slideId: string):TimerData {
-  // note, we only need to store slide id and not its session because that's how they're scoped already
+  const idFlag = timerToken.flags?.find((f): f is { type: TimerFlagType.ID; value: string } => f.type === TimerFlagType.ID);
+  
   const timerData: TimerData = {
-    id: `${slideId}-${tokenInd}`,
+    id: idFlag ? `${timerToken.timerType}-${idFlag.value}` : `${slideId}-${tokenInd}`,
     timerType: timerToken.timerType,
-    slideId: slideId,
+    slideIds: [slideId],
     duration: timerToken.duration,
     flags: timerToken.flags
   }

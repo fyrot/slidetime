@@ -17,7 +17,7 @@ let extractRetries = 0;
 
 const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
 
-const timerElmRecord: Record<string, SVGTextElement> = {};
+const timerElmRecord: Record<string, SVGTextElement[]> = {};
 const firedSet = new Set<string>();
 
 const PORT_NAME = "gfn-timer";
@@ -212,7 +212,10 @@ function extractFromCurrentSlide(): boolean {
     
     const timerData = buildTimerData(parsedTimerToken, tokenInd, slideId);
     if (!timerElmRecord[timerData.id]) {
-      timerElmRecord[timerData.id] = textNode;
+      timerElmRecord[timerData.id] = [];
+    }
+    if (!timerElmRecord[timerData.id].includes(textNode)) {
+      timerElmRecord[timerData.id].push(textNode);
       foundTimers.push(timerData);
     }
     tokenInd++;
@@ -386,10 +389,13 @@ function renderLoop() {
 
   if (cachedTimerStates) {
     for (const timerState of cachedTimerStates.timers) {
-      const nodeRef = timerElmRecord[timerState.id];
-      if (!nodeRef) { continue; }
+      const nodeRefs = timerElmRecord[timerState.id];
+      if (!nodeRefs) { continue; }
 
-      nodeRef.textContent = formatTimer(timerState, currentOptions);
+      const formatted = formatTimer(timerState, currentOptions);
+      for (const nodeRef of nodeRefs) {
+        nodeRef.textContent = formatted;
+      }
       checkAutoAdvance(timerState);
     }
   }
