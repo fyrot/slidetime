@@ -3,7 +3,7 @@
 All items listed *underneath* a version header are associated with that version and the changes it introduced. 
 <!-- this is a changelog file that will loosely model the keepachangelog "standard", grouping changes by release order  -->
 
-## 1.0.3
+## 1.1.0
 
 ### Added
 
@@ -11,9 +11,14 @@ All items listed *underneath* a version header are associated with that version 
 
 ### Changed
 
+- Internal: in accordance with manifest v3 paradigms for extensions, the background store worker now acts as a cache for the true timer state database, which is now session storage
 - Internal: flags are now distinguished by an array of applied flags
 - Internal: applied flags now can carry values other than booleans 
 - Internal: slide IDs are stored as an array to allow timers to update on multiple slides 
+
+### Fixed
+
+- Fixed major bug where a presentation placed in the background for too long (>30 secs) would cause extension scripts to fall asleep or be deactivated by Chrome, losing content-background state and rendering already-registered timers frozen; tldr: bug stemmed from inactive/background tab leading Chrome to remove the background service worker, which the local content script would sync with even on a disconnected port, leaving the DOM stuck because no new times could be written.
 
 ## 1.0.2 
 

@@ -4,6 +4,8 @@ import { buildTimerData, parseTimerToken } from "~parse-timers";
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types";
 import { debugLog } from "~utils/debug-options";
 
+// this file is kind of long haha, wonder if we should spread out these functions a bit better
+
 debugLog("GFN Timer: content script injected");
 
 // variable interval ping definitions
@@ -72,6 +74,7 @@ function makePort() {
   
   // auto reconnect
   newPort.onDisconnect.addListener(() => {
+    currentSlideId = "";
     port = makePort();
   })
 

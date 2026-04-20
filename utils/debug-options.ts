@@ -1,5 +1,5 @@
 const DEBUG_MODE = false;
-
+//console.log("blah")
 export function debugLog(text: string) {
   if (!DEBUG_MODE) { return; }
   console.log(text);

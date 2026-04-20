@@ -1,7 +1,7 @@
 {
   "name": "slidetime",
   "displayName": "Slidetime",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Turn text phrases in Google Slides into live timers, countdowns, clocks, and more when presenting.",
   "author": "fyrot@outlook.com",
   "scripts": {
