@@ -1,4 +1,8 @@
-# Slidetime
+
+<h1 align="center">
+  <img src="https://raw.githubusercontent.com/fyrot/slidetime/refs/heads/main/assets/icon.png" height="28">
+  Slidetime
+</h1>
 
 [![Get it on the Chrome Web Store](https://developer.chrome.com/static/docs/webstore/branding/image/UV4C4ybeBTsZt43U4xis.png)](https://chromewebstore.google.com/detail/slidetime/ogmlodhmcglfnaphcgojbobkadlbomji)
 
