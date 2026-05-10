@@ -3,6 +3,17 @@
 All items listed *underneath* a version header are associated with that version and the changes it introduced. 
 <!-- this is a changelog file that will loosely model the keepachangelog "standard", grouping changes by release order  -->
 
+## 1.2.0
+
+### Added
+
+- New setting implemented to allow timers play a preset sound when they hit zero 
+- Reference cards now allow click-to-copy; commands can be copied from the extension window 
+
+### Changed
+
+- Shortened description for the "Pause/Play Timer" setting
+
 ## 1.1.0
 
 ### Added

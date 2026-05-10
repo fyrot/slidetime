@@ -20,14 +20,14 @@ const booleanSettings: ToggleSetting[] = [
   },
   {
     key: "countdownSound",
-    name: "Zero Sound",
-    description: "Play a sound when a countdown or timeto timer reaches 0:00"
+    name: "Timer Alarm",
+    description: "Plays a sound when a countdown timer reaches 0:00"
   },
  {
     key: "pausePlayTimers",
     name: "Pause/Play Timers",
-    description: "Be able to pause/play presented timers by pressing 'y'"
-  } // omit this for now since it hasn't been implemented yet 
+    description: "Pause/play timers on a slide by pressing 'y'"
+  } 
 ]
 
 function SettingsTab() {
