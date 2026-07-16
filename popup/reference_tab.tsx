@@ -54,7 +54,7 @@ function ReferenceTab() {
   return (
     <div className="space-y-2.5">
       {referenceCards.map((cardData) => {
-        return <CommandCard command={cardData.command} description={cardData.description} />
+        return <CommandCard key={cardData.command} command={cardData.command} description={cardData.description} />
       })}
     </div>
   )

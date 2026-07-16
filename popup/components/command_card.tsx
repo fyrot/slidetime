@@ -65,7 +65,7 @@ function CommandCard(props: { command: string; description: string }) {
         </span>
       
       </code>
-      <p className="text-xs mt-2 leading-relaxed" style={{ color: theme.text.secondary }}>
+      <p className="text-xs leading-relaxed" style={{ color: theme.text.secondary }}>
         {description}
       </p>
     </div>

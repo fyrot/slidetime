@@ -88,9 +88,13 @@ function TestPopup() {
       />
 
       {/* footer content */}
-      <div className="px-4 py-2 text-center" style={{ color: theme.text.muted }}>
-        <p className="text-[10px]">slidetime / {activeTab}</p> {/* "navigation" display */}
-      </div>
+      { 
+      <div className="py-2 text-center" style={{ color: theme.text.muted }}>
+        <p className="text-[10px]">slidetime / {activeTab}</p> 
+      </div> 
+      }
+      {/* "navigation" display */}
+
 
       {/* bottom scroll content fade */}
       <div

@@ -373,7 +373,7 @@ function advanceSlide() {
 }
 
 function playZeroSound() {
-  const audio = new Audio(chrome.runtime.getURL("assets/alarm.ogg"));
+  const audio = new Audio(chrome.runtime.getURL("assets/sound/xylophone.ogg"));
   audio.volume = 0.8;
   audio.play();
 }

@@ -31,3 +31,6 @@ dist/
 
 # typescript
 .tsbuildinfo
+
+# used for plasmo build actions, keep secret!!
+keys.json 

@@ -1,7 +1,9 @@
 import type { ToggleSetting } from "./components/toggle_setting_card"
 import ToggleSettingCard from "./components/toggle_setting_card"
 import { useTheme } from "./theme_context"
-
+import FadeIn from "./animated/fade_in"
+import { useSettingsStorage } from "./hooks/useSettingsStorage"
+import { Fragment } from "react"
 /* write toggleable (boolean - on/off) settings here
       key: internal setting id key used by chrome local storage
       name: setting title rendered in card pill by ui
@@ -33,13 +35,24 @@ const booleanSettings: ToggleSetting[] = [
 function SettingsTab() {
   const { theme } = useTheme()
 
+  const showAlarmSelector = useSettingsStorage<boolean>("countdownSound", false);
+
   return (
     <div style={{ color: theme.text.secondary }} className="space-y-2.5">
       {/* <p className="text-sm">Settings</p> */}
 
       { /* boolean settings use toggle setting card for rendering*/ }
       {booleanSettings.map((settingData) => {
+        if (settingData.key == "countdownSound") {
+          return (<div key={settingData.key}>
+            <ToggleSettingCard setting={settingData} />
+            <FadeIn expanded={showAlarmSelector} duration={300}>
+              <p> Wow, it worked! </p>
+            </FadeIn>
+          </div>)
+        }
         return <ToggleSettingCard setting={settingData} /> 
+      
       }) }
     </div>
   )

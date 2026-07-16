@@ -1,5 +1,14 @@
 # Changelog 
 
+## 1.2.1
+
+### Added
+
+- New alarm sound (xylophone) for the sound-when-zero timer setting
+- New component to allow selection from a list 
+- New setting that allows users to compact the pop-up UI 
+
+
 All items listed *underneath* a version header are associated with that version and the changes it introduced. 
 <!-- this is a changelog file that will loosely model the keepachangelog "standard", grouping changes by release order  -->
 
