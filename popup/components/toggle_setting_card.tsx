@@ -44,12 +44,13 @@ function ToggleSettingCard({ setting }: { setting: ToggleSetting }) {
         borderColor: theme.border.default,
       }}
     >
-      {/* row 1 */}
-      <div className="flex items-center justify-between">
-        
+      {/* row 1 — gap guarantees a minimum gutter between the pill and knob
+          even when justify-between collapses on a wide/wrapped pill */}
+      <div className="flex items-center justify-between gap-3">
+
         {/* setting name pill */ }
         <span
-          className="text-xs font-bold py-2 px-4 rounded-2xl"
+          className="text-[0.7rem] font-bold py-2 px-4 rounded-2xl"
           style={{
             color: theme.text.code,
             background: theme.surface.code,
@@ -60,6 +61,8 @@ function ToggleSettingCard({ setting }: { setting: ToggleSetting }) {
         >
           {setting.name}
         </span>
+
+
       {/* setting toggle knob */ }
         <button
           onClick={handleToggle}

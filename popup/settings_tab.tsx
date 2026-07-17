@@ -4,6 +4,10 @@ import { useTheme } from "./theme_context"
 import FadeIn from "./animated/fade_in"
 import { useSettingsStorage } from "./hooks/useSettingsStorage"
 import { Fragment } from "react"
+import SpinnerSelector, { type SpinnerSetting } from "./components/spinner_selector"
+import { ALARM_STORAGE_KEY, alarmSoundSettings } from "./settings/alarmSounds"
+
+
 /* write toggleable (boolean - on/off) settings here
       key: internal setting id key used by chrome local storage
       name: setting title rendered in card pill by ui
@@ -13,12 +17,12 @@ const booleanSettings: ToggleSetting[] = [
   {
     key: "24hr",
     name: "Military Time",
-    description: "Display time in a 24 hour format"
+    description: "Displays time in a 24 hour format"
   },
   {
     key: "countdownAdvance",
-    name: "Advanced Countdown",
-    description: "Move forward one slide when a countdown reaches 0:00"
+    name: "Advance on Zero",
+    description: "Clicks forward when a countdown reaches 0:00"
   },
   {
     key: "countdownSound",
@@ -28,9 +32,10 @@ const booleanSettings: ToggleSetting[] = [
  {
     key: "pausePlayTimers",
     name: "Pause/Play Timers",
-    description: "Pause/play timers on a slide by pressing 'y'"
+    description: "Pauses/plays timers on a slide by pressing 'y'"
   } 
 ]
+
 
 function SettingsTab() {
   const { theme } = useTheme()
@@ -46,8 +51,8 @@ function SettingsTab() {
         if (settingData.key == "countdownSound") {
           return (<div key={settingData.key}>
             <ToggleSettingCard setting={settingData} />
-            <FadeIn expanded={showAlarmSelector} duration={300}>
-              <p> Wow, it worked! </p>
+            <FadeIn className="mt-2.5" expanded={showAlarmSelector} duration={300}>
+              <SpinnerSelector settingKey={ALARM_STORAGE_KEY} name="Countdown Sound" options={alarmSoundSettings}/>
             </FadeIn>
           </div>)
         }

@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react"
 
+// a hook so we can react to changes in ToggleSettings
+// may rename/refactor this to something else later in case other kinds of settings need this level of reactivity
+
+
 export function useSettingsStorage<T>(key: string, defaultValue: T): T {
   const [settingValue, setSettingValue] = useState<T>(defaultValue);
 

@@ -1,7 +1,7 @@
 {
   "id": "light",
   "displayName": "Air",
-  "themeDisplayColor": "#f5f5f5",
+  "themeDisplayColor": "#00bfff",
 
   "surface": {
     "base": "#f5f5f5",

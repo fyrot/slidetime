@@ -1,0 +1,45 @@
+{
+  "id": "ghost",
+  "displayName": "Ghost",
+  "themeDisplayColor": "#f5f5f5",
+  "surface": {
+    "base": "#f5f5f5",
+    "elevated": "#e8e8e8",
+    "overlay": "#474747",
+    "code": "#474747",
+    "toggle": "#d0d0d0"
+  },
+  "text": {
+    "primary": "#141414",
+    "secondary": "#474747",
+    "muted": "#7a7a7a",
+    "accent": "#141414",
+    "code": "#ffffff"
+  },
+  "border": {
+    "default": "#7a7a7a",
+    "active": "#141414",
+    "subtle": "#ffffff"
+  },
+  "effects": {
+    "overlay": {
+      "opacity": 0.75,
+      "blur": "24px"
+    },
+    "fade": "#f5f5f5"
+  },
+  "tabSelector": {
+    "idle": {
+      "color": "#ffffff"
+    },
+    "hover": {
+      "color": "#ffffff",
+      "background": "#141414",
+      "opacity": 0.15
+    },
+    "active": {
+      "color": "#ffffff",
+      "background": "#141414"
+    }
+  }
+}

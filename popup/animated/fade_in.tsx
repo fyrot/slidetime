@@ -2,9 +2,10 @@ interface FadeInProps {
   expanded: boolean
   children: React.ReactNode
   duration: number // fade in duration in milliseconds
+  className?: string
 }
 
-const FadeIn = ( { expanded, children, duration = 300} : FadeInProps) => {
+const FadeIn = ( { expanded, children, duration = 500, className = ""} : FadeInProps) => {
   return (
     <div className={`
       grid
@@ -12,6 +13,7 @@ const FadeIn = ( { expanded, children, duration = 300} : FadeInProps) => {
       min-h-0
       ${expanded ? "opacity-100" : "opacity-0"}
       ${expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}
+      ${className}
       `}
       style={{transitionDuration: `${duration}ms`}}
       >

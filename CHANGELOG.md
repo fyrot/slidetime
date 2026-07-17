@@ -1,13 +1,20 @@
 # Changelog 
 
-## 1.2.1
+## 1.3.0
 
 ### Added
 
+- New theme (Ghost) that is also the new default, Air is kept as an alternate theme
 - New alarm sound (xylophone) for the sound-when-zero timer setting
-- New component to allow selection from a list 
-- New setting that allows users to compact the pop-up UI 
+- New option that appears when sound-when-zero is on to select preferred alarm sound
 
+- Internal: new component to allow selection from a list
+- Internal: local storage cache system to allow for  
+- Internal: store listing redesign with screenshots
+
+### Changed
+
+- The presented order of the themes has changed
 
 All items listed *underneath* a version header are associated with that version and the changes it introduced. 
 <!-- this is a changelog file that will loosely model the keepachangelog "standard", grouping changes by release order  -->

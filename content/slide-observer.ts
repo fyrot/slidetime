@@ -3,6 +3,7 @@ import type { PlasmoCSConfig } from "plasmo";
 import { buildTimerData, parseTimerToken } from "~parse-timers";
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types";
 import { debugLog } from "~utils/debug-options";
+import { getAlarmSoundLocation } from "~popup/settings/alarmSounds";
 
 // this file is kind of long haha, wonder if we should spread out these functions a bit better
 
@@ -373,7 +374,7 @@ function advanceSlide() {
 }
 
 function playZeroSound() {
-  const audio = new Audio(chrome.runtime.getURL("assets/sound/xylophone.ogg"));
+  const audio = new Audio(chrome.runtime.getURL(getAlarmSoundLocation()));
   audio.volume = 0.8;
   audio.play();
 }

@@ -1,8 +1,8 @@
 {
   "name": "slidetime",
   "displayName": "Slidetime",
-  "version": "1.2.1",
-  "description": "Turn text phrases in Google Slides into live timers, countdowns, clocks, and more when presenting.",
+  "version": "1.3.0",
+  "description": "Turns placeholder text in Google Slides into live timers, countdowns, clocks, that update automatically when you present.",
   "author": "fyrot@outlook.com",
   "scripts": {
     "dev": "plasmo dev",
@@ -41,8 +41,9 @@
           "assets/icon-light.png", 
           "assets/icon-dark.png", 
           "assets/128/light-alt.png", 
-          "assets/128/dark-alt.png", 
-          "assets/sound/xylophone.ogg"
+          "assets/128/dark-alt.png",
+          "assets/sound/xylophone.ogg",
+          "assets/sound/digital.ogg"
         ],
         "matches": ["<all_urls>"]
       }
