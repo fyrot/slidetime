@@ -90,7 +90,7 @@ function IndexPopup() {
   // Toggling and saving option state
   function toggleOption(id: string) {
     const updatedOptions = options.map(function (opt) {
-      if (opt.id === id) {
+      if (opt.id === id) { 
         return { ...opt, enabled: !opt.enabled }
       }
         return opt
