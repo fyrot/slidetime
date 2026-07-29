@@ -1,9 +1,9 @@
 {
   "name": "slidetime",
   "displayName": "Slidetime",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Turns placeholder text in Google Slides into live timers, countdowns, clocks, that update automatically when you present.",
-  "author": "fyrot@outlook.com",
+  "author": "fyrot",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",

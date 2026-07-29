@@ -1,11 +1,14 @@
 import { TimerFlagType } from "~timer-types";
 import type { AppliedFlag, TimerData, TimerType } from "~timer-types";
 
-// Format: <<timerExpr>> or <<timerExpr|flag1&flag2&flag3>>
+// Format: <<timerExpr>> or <<timerExpr|flag1,flag2,flag3>>
 // timerExpr is one of:
 //   keyword  → time | date | shortdate | longdate
 //   timeto   → ~H:MM  (first char ~ = "time until next occurrence")
 //   stopwatch/countdown → mm:ss+ or mm:ss-  (last char determines direction)
+
+// ^ above is out of date, update soon for easier reference 
+
 const TIMER_REGEX = /^<<([^|>]+?)(?:\|([^>]*))?>>$/;
 
 export interface ParsedTimerToken {
@@ -83,6 +86,9 @@ export function parseTimerToken(tokenTxt: string) {
 
   return null;
 }
+
+
+
 
 export function buildTimerData(timerToken: ParsedTimerToken, tokenInd: number, slideId: string):TimerData {
   const idFlag = timerToken.flags?.find((f): f is { type: TimerFlagType.ID; value: string } => f.type === TimerFlagType.ID);

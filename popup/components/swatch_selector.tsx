@@ -56,6 +56,7 @@ function SwatchSelector({ title, items, selectedId, onSelect }: SwatchSelectorPr
                 borderWidth: isSelected ? 2 : 1,
                 borderStyle: "solid",
                 borderColor: isSelected ? theme.text.accent : theme.border.default,
+                boxShadow: isSelected ? "none" : `0 0 0 1.5px ${theme.border.swatchRing}80`,
                 padding: 2,
               }}
             />

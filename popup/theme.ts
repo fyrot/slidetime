@@ -33,6 +33,7 @@ export interface PopupTheme {
     default: string          // standard borders
     active: string           // active/focused element borders
     subtle: string           // code blocks, dividers
+    swatchRing: string       // contrast ring around unselected color swatches (theme/icon selectors)
   }
   effects: {
     overlay: {               // applied to floating overlay surfaces

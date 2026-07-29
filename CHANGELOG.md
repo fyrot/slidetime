@@ -1,5 +1,24 @@
 # Changelog 
 
+## 1.3.1
+
+### Added
+
+- New personalization disabled border parameter for all themes for better contrast
+
+- Internal: uploaded the new screenshot promotional material to the codebase (not bundled with extension builds)
+
+### Changed
+
+- Changed the blue accent color in the Air theme to be slightly darker
+- Adjusted the opacity of the navigation header and other surfaces in the Ghost theme
+
+- Internal: kept store description up-to-date with the back-up copy 
+
+### Fixed 
+
+- Resolved visual bug where double the margin would appear between the "Timer Alarm" and "Pause/Play" settings cards  
+
 ## 1.3.0
 
 ### Added

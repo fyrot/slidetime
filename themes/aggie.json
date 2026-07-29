@@ -19,7 +19,8 @@
   "border": {
     "default": "#732F2F",
     "active": "#D6D3C4",
-    "subtle": "#5A1A1A"
+    "subtle": "#5A1A1A",
+    "swatchRing": "#A08080"
   },
   "effects": {
     "overlay": {

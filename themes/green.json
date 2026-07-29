@@ -20,7 +20,8 @@
   "border": {
     "default": "#b8cdbf",
     "active": "#4d8260",
-    "subtle": "#dce6de"
+    "subtle": "#dce6de",
+    "swatchRing": "#6b9b7a"
   },
   "effects": {
     "overlay": {

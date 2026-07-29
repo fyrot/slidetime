@@ -13,7 +13,7 @@ const FadeIn = ( { expanded, children, duration = 500, className = ""} : FadeInP
       min-h-0
       ${expanded ? "opacity-100" : "opacity-0"}
       ${expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}
-      ${className}
+      ${expanded ? className : ""}
       `}
       style={{transitionDuration: `${duration}ms`}}
       >
