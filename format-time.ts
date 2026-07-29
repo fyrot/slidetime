@@ -46,13 +46,13 @@ export function formatTime(type: "time" | "shorttime" | "longtime" | "datetime" 
   const is24Hr = options["24hr"] ?? false;
   const currentDate = new Date();
   if (type === "shorttime") {
-    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit" }); // 1:05 pm or 13:05
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit" }); // 1:05:09 PM or 13:05:09
   } else if (type === "datetime") {
     return currentDate.toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: !is24Hr }); // Saturday, April 4, 2026, 1:05:09 PM or Saturday, April 4, 2026, 13:05:09
   } else if (type === "longtime") {
     return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 }); // 1:05:09.123 PM or 13:05:09.123
   } else {
-    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit", second: "2-digit" }); // 1:05:09 PM or 13:05:09
+    return currentDate.toLocaleTimeString([], { hour12: !is24Hr, hour: "numeric", minute: "2-digit" }); // 1:05 pm or 13:05
   }
 }
 

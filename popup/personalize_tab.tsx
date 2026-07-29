@@ -1,4 +1,5 @@
 import IconSelector from "./components/icon_selector"
+import RequestReviewLine from "./components/request_review_line"
 import ThemeSelector from "./components/theme_selector"
 import ToggleSettingCard from "./components/toggle_setting_card"
 
@@ -10,6 +11,7 @@ function PersonalizeTab() {
       <ThemeSelector />
       <IconSelector />
       { /* <ToggleSettingCard  /> */ }
+      <RequestReviewLine />
     </div>
   )
 }

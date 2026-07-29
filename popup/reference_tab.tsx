@@ -11,7 +11,7 @@ interface CommandReference {
 const referenceCards: CommandReference[] = [
   {
     command: "<<time>>",
-    description: "Displays the current time (hh:mm:ss pm/am)",
+    description: "Displays the current time (hh:mm pm/am)",
   },
   {
     command: "<<date>>",
@@ -31,7 +31,7 @@ const referenceCards: CommandReference[] = [
   },
   {
     command: "<<shorttime>>",
-    description: "Displays the current time (hh:mm pm/am)",
+    description: "Displays the current time (hh:mm:ss pm/am)",
   },
   {
     command: "<<longtime>>",

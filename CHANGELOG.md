@@ -1,5 +1,16 @@
 # Changelog 
 
+## 1.3.2
+
+### Added
+
+- New review link in personalization tab that redirects to browser/store-dependent listing 
+
+### Changed
+
+- The <<time>> text now maps to "hh:mm am/pm" (previously "hh:mm:ss am/pm")
+- The <<shorttime>> text now maps to "hh:mm:ss am/pm" (previously "hh:mm am/pm")
+
 ## 1.3.1
 
 ### Added
