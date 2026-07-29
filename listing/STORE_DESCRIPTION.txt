@@ -1,0 +1,35 @@
+Turns placeholder text in Google Slides into live timers, countdowns, clocks, that update automatically when you present.
+
+Slidetime is a browser extension that lets you transform placeholders in Google Slides into timers, countdowns, clocks, and more that update automatically when presenting.
+
+You can embed timers, countdowns, clocks, and dates that appear when you present with simple placeholders like "<<time>>". Try it out yourself with some of the commands below!
+
+All features are free.
+
+--
+
+Reference for placeholders
+
+<<time>>              Displays the current time (hh:mm pm/am)
+<<date>>              Displays a shortened version of the date (mm/dd/yy)
+<<mm:ss->>         Displays a countdown that goes from mm:ss to 0:00
+<<mm:ss+>>        Displays a stopwatch that starts at mm:ss
+<<~hh:mm>>       Displays a countdown that counts down to hh:mm
+<<shorttime>>     Displays the current time (hh:mm:ss pm/am)
+<<longtime>>       Displays the current time with millisecond precision (hh:mm:ss.SSS)
+<<shortdate>>     Displays the current date (ex: Mon, Apr 14)
+<<longdate>>       Displays the current date (ex: Monday, April 14, 2026)
+
+You can extend the functionality of these placeholders by adding "flags" after a pipe (|). Flags change how a specific timer behaves, and can be combined with a comma.
+
+<<time|24hr>>                         Forces 24-hour time formatting ("military time") instead of 12-hour am/pm
+<<mm:ss-|reset>>                   Resets the timer's elapsed time whenever you navigate away from its slide
+<<mm:ss-|id=namehere>>     Syncs this timer with any other placeholder using the same id, even across slides
+
+Example: <<0:00+|id=stop1,reset>> creates a stopwatch that can be seen counting up from the same value on each slide it's included on
+
+A version of the reference above is also available within the extension. 
+
+--
+
+The Slidetime team is always looking for ways to improve this project; we'd greatly appreciate if you left us some feedback or a review!
