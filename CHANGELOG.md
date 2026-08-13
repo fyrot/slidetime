@@ -1,5 +1,16 @@
 # Changelog 
 
+## Unreleased
+
+### Added
+
+- Added automated parser, wrapped-token discovery, lifecycle, and timer-engine tests.
+
+### Fixed
+
+- Timer placeholders are now detected when Google Slides wraps them across multiple SVG text runs.
+- Present mode now retries extraction until slide text is rendered and re-scans after Google Slides recreates the slide DOM.
+
 ## 1.3.2
 
 ### Added
@@ -101,4 +112,3 @@ All items listed *underneath* a version header are associated with that version 
 - Scroll behavior in the popup now returns to the top of the page when navigating between menus. 
 
 ## 1.0.0 (Initial release)
-

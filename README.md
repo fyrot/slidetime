@@ -20,6 +20,12 @@ Slidetime is a lightweight browser extension that allows placeholder phrases to 
 `<<shortdate>>` | Displays the current date, abbreviated (ex: Tue, Apr 14)     
 `<<longdate>>` | Displays the current date (ex: Tuesday, April 14, 2026)
 
+Timer flags follow a `|` inside the placeholder, and multiple flags are separated with `&`. For example, `<<5:00-|id=workshop&reset>>` creates a five-minute countdown with the shared id `workshop` and resets it when you navigate to a slide that does not contain it.
+
+The `id=` flag links placeholders into one logical timer. A shared timer runs while any slide containing that id is shown, pauses on other slides, and resumes from its banked elapsed time when you return. Each id has an independent time budget. The `reset` flag instead zeroes that timer's banked elapsed time when you leave its slide. All presentation timer state resets when you exit present mode.
+
+Timer placeholders continue to work when Google Slides wraps the placeholder across lines or splits it into multiple formatting runs.
+
 ## Installation 
 
 You can find this project on the [Chrome Web Store](https://chromewebstore.google.com/detail/slidetime/ogmlodhmcglfnaphcgojbobkadlbomji), where you can add it to your browser.

@@ -1,5 +1,6 @@
 import { formatTimer, getElapsedMs } from "~format-time";
 import type { PlasmoCSConfig } from "plasmo";
+import { claimView, discoverTimerViews } from "~content/extract-timers";
 import { buildTimerData, parseTimerToken } from "~parse-timers";
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types";
 import { debugLog } from "~utils/debug-options";
@@ -13,14 +14,19 @@ debugLog("GFN Timer: content script injected");
 const SLIDE_CHANGED_INTERVAL = 100; // 0.1s
 const STATE_SYNC_INTERVAL = 5000;
 
-const INITIAL_RETRIES = 10;
+const INITIAL_RETRIES = 30;
 let extractRetries = 0;
 
 // for selecting text nodes from rendered slide
 
 const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
 
-const timerElmRecord: Record<string, SVGTextElement[]> = {};
+interface TimerView {
+  display: SVGTextElement
+  blanks: SVGTextElement[]
+}
+
+const timerElmRecord: Record<string, TimerView[]> = {};
 const firedSet = new Set<string>();
 const soundFiredSet = new Set<string>();
 
@@ -35,6 +41,9 @@ const PAUSE_PLAY_KEY = "y";
 let currentSlideId = "";
 let inPresentMode = false;
 let presentDocument: Document | null = null;
+let presentDocumentObserver: MutationObserver | null = null;
+let observedPresentDocument: Document | null = null;
+let mutationExtractTimeout: number | null = null;
 
 // moving to content scripts acting on caches from the background store 
 let slideCheckInterval: number | null = null;
@@ -118,7 +127,7 @@ function enterPresentMode() {
   if (!slideCheckInterval) {
     checkSlideChange(); // run immediately on enter
     setTimeout(() => {
-      slideCheckInterval = setInterval(() => {checkSlideChange();}, SLIDE_CHANGED_INTERVAL);
+      slideCheckInterval = window.setInterval(() => {checkSlideChange();}, SLIDE_CHANGED_INTERVAL);
     }, 500);
     
   }
@@ -126,7 +135,7 @@ function enterPresentMode() {
   // -> also serves as a heartbeat to keep the service worker alive
   if (!stateSyncInterval) {
     getTimerStates();
-    stateSyncInterval = setInterval(getTimerStates, STATE_SYNC_INTERVAL);
+    stateSyncInterval = window.setInterval(getTimerStates, STATE_SYNC_INTERVAL);
   }
 
    
@@ -161,6 +170,7 @@ function exitPresentMode() {
     delete timerElmRecord[key];
   }
   // presentDocument removal now is here
+  disconnectPresentDocumentObserver();
   presentDocument = null;
 
   const messageContent: TimerMessaging = {
@@ -207,22 +217,35 @@ function extractFromCurrentSlide(): boolean {
   }
 
   const allTextNodes = doc.querySelectorAll<SVGTextElement>(TEXT_NODE_QUERY);
+  if (allTextNodes.length === 0) {
+    debugLog(`GFN Timer: extract -> slide ${slideId} not ready (no rendered text nodes)`);
+    return false;
+  }
+
+  pruneTimerViews();
+
   const foundTimers: TimerData[] = [];
   let tokenInd = 0;
 
-  for (const textNode of allTextNodes) {
-    const text = textNode.textContent ?? "";
-    const parsedTimerToken = parseTimerToken(text);
+  for (const view of discoverTimerViews(doc)) {
+    const tokenText = view.tokenText.replace(/\s+/g, "");
+    const parsedTimerToken = parseTimerToken(tokenText);
 
     if (parsedTimerToken == null) { continue; }
-    
+
     const timerData = buildTimerData(parsedTimerToken, tokenInd, slideId);
+    claimView(view, timerData.id);
+
     if (!timerElmRecord[timerData.id]) {
       timerElmRecord[timerData.id] = [];
     }
-    if (!timerElmRecord[timerData.id].includes(textNode)) {
-      timerElmRecord[timerData.id].push(textNode);
+    if (!hasRecordedDisplay(view.displayNode)) {
+      timerElmRecord[timerData.id].push({
+        display: view.displayNode,
+        blanks: view.blankNodes
+      });
       foundTimers.push(timerData);
+      debugLog(`GFN Timer: discovered timer ${tokenText} -> ${timerData.id}`);
     }
     tokenInd++;
   }
@@ -231,6 +254,7 @@ function extractFromCurrentSlide(): boolean {
   debugLog(`GFN Timer: Parsed ${tokenInd} timer tokens`);
  
   if (foundTimers.length > 0) {
+    debugLog(`GFN Timer: registering ${foundTimers.length} timer view(s)`);
     const messageContent:TimerMessaging = {
       messageType: TimerMessage.REGISTER_TIMERS,
       timers: foundTimers
@@ -248,6 +272,7 @@ function onSlideChanged(): boolean {
   //  this is a more robust, stable method that will likely require less dev intervention
   const slideId = getCurrentSlideId();
   const extracted = extractFromCurrentSlide();
+  debugLog(`GFN Timer: activating slide ${slideId}`);
   const messageContent:TimerMessaging = {
     messageType: TimerMessage.SLIDE_CHANGED,
     slideId: slideId
@@ -268,22 +293,75 @@ function getTimerStates() {
 }
 
 function getPresentDocument(): Document | null {
-  
-  if (presentDocument?.querySelector(PRESENT_MODE_QUERY)) {
-    return presentDocument;
-  }
-
   // we gotta iterate through each iframe and get its document to access the present mode text
   for (const iframe of document.querySelectorAll("iframe")) {
     const doc = iframe.contentDocument;
     if (doc?.querySelector(PRESENT_MODE_QUERY)) {
-      presentDocument = doc;
+      if (presentDocument !== doc) {
+        presentDocument = doc;
+      }
+      attachPresentDocumentObserver(doc);
       return doc;
     }
   }
 
+  disconnectPresentDocumentObserver();
   presentDocument = null;
   return null;
+}
+
+function attachPresentDocumentObserver(doc: Document) {
+  if (observedPresentDocument === doc || !doc.body) { return; }
+
+  disconnectPresentDocumentObserver();
+  presentDocumentObserver = new MutationObserver((mutations) => {
+    const includesExternalMutation = mutations.some((mutation) => {
+      const target = mutation.target.nodeType === 1
+        ? mutation.target as Element
+        : mutation.target.parentElement;
+      return !target?.closest?.("[data-slidetime-owned]");
+    });
+    if (!includesExternalMutation) { return; }
+
+    if (mutationExtractTimeout != null) {
+      clearTimeout(mutationExtractTimeout);
+    }
+    mutationExtractTimeout = window.setTimeout(() => {
+      mutationExtractTimeout = null;
+      if (!inPresentMode) { return; }
+      debugLog(`GFN Timer: re-extract-on-mutation for slide ${getCurrentSlideId()}`);
+      if (extractFromCurrentSlide()) {
+        getTimerStates();
+      }
+    }, 150);
+  });
+  presentDocumentObserver.observe(doc.body, { childList: true, subtree: true });
+  observedPresentDocument = doc;
+}
+
+function disconnectPresentDocumentObserver() {
+  presentDocumentObserver?.disconnect();
+  presentDocumentObserver = null;
+  observedPresentDocument = null;
+  if (mutationExtractTimeout != null) {
+    clearTimeout(mutationExtractTimeout);
+    mutationExtractTimeout = null;
+  }
+}
+
+function pruneTimerViews() {
+  for (const [timerId, views] of Object.entries(timerElmRecord)) {
+    timerElmRecord[timerId] = views.filter(({ display }) => display.isConnected);
+    if (timerElmRecord[timerId].length === 0) {
+      delete timerElmRecord[timerId];
+    }
+  }
+}
+
+function hasRecordedDisplay(displayNode: SVGTextElement): boolean {
+  return Object.values(timerElmRecord).some((views) =>
+    views.some(({ display }) => display === displayNode)
+  );
 }
 
 function isInPresentMode(): boolean {
@@ -296,27 +374,40 @@ function checkSlideChange() {
   if (!inPresentMode) return;
 
   const id = getCurrentSlideId();
+  const previousPresentDocument = presentDocument;
+  const doc = getPresentDocument();
+  if (!doc) { return; }
+
+  // iframe is ready — retry pause listener attach if the setting is on and it wasn't attached at enter time
+  if (currentOptions?.pausePlayTimers) {
+    attachPauseListener();
+  }
+
+  const presentDocumentChanged = doc !== previousPresentDocument;
+  if (presentDocumentChanged && id === currentSlideId) {
+    debugLog(`GFN Timer: re-extract-on-document-change for slide ${id}`);
+    if (extractFromCurrentSlide()) {
+      getTimerStates();
+    }
+  }
+
   if (id !== currentSlideId) {
     //debugLog("GFN Timer: slide changed from", currentSlideId, "to", id);
-    const doc = getPresentDocument();
-    if (!doc) { return; }
-
-    // iframe is ready — retry pause listener attach if the setting is on and it wasn't attached at enter time
-    if (currentOptions?.pausePlayTimers) {
-      attachPauseListener();
-    }
-
-    debugLog("trying..")
+    debugLog(`GFN Timer: extraction attempt ${extractRetries + 1} for slide ${id}`)
     if (onSlideChanged()) {
-      debugLog("onslidechanged hit");
+      debugLog(`GFN Timer: extraction ready for slide ${id}`);
       currentSlideId = id;
       extractRetries = 0;
       getTimerStates();
-    } else if (extractRetries++ > INITIAL_RETRIES) {
-      debugLog("extract retry limit hit");
-      currentSlideId = id;
-      extractRetries = 0;
-      getTimerStates();
+    } else {
+      extractRetries++;
+      debugLog(`GFN Timer: extraction not ready for slide ${id}; retry ${extractRetries}/${INITIAL_RETRIES}`);
+      if (extractRetries >= INITIAL_RETRIES) {
+        debugLog(`GFN Timer: extraction retry limit hit for slide ${id}`);
+        currentSlideId = id;
+        extractRetries = 0;
+        getTimerStates();
+      }
     }
     
   }
@@ -423,14 +514,20 @@ function renderLoop() {
     return;
   }
 
+  pruneTimerViews();
+
   if (cachedTimerStates) {
     for (const timerState of cachedTimerStates.timers) {
-      const nodeRefs = timerElmRecord[timerState.id];
-      if (!nodeRefs) { continue; }
+      const views = timerElmRecord[timerState.id];
+      if (!views) { continue; }
 
       const formatted = formatTimer(timerState, currentOptions);
-      for (const nodeRef of nodeRefs) {
-        nodeRef.textContent = formatted;
+      for (const view of views) {
+        // skip the write when unchanged: every textContent assignment replaces the
+        // text child node, which needlessly churns the present-document observer
+        if (view.display.textContent !== formatted) {
+          view.display.textContent = formatted;
+        }
       }
       checkAutoAdvance(timerState);
       checkZeroSound(timerState);
