@@ -128,12 +128,38 @@ describe("resolveTimerAssignments", () => {
     ));
 
     const assignments = resolveTimerAssignments(discoverTimerViews(root), "slide-A", []);
-    expect(assignments.map(({ timerData }) => timerData.id).sort()).toEqual([
-      "slide-A-0",
-      "slide-A-1"
-    ]);
     const countdown = assignments.find(({ timerData }) => timerData.timerType === "countdown");
-    expect(countdown?.timerData.id).toBe("slide-A-1");
+    const stopwatch = assignments.find(({ timerData }) => timerData.timerType === "stopwatch");
+    expect(stopwatch?.timerData.id).toBe("slide-A-0"); // claimed id kept
+    expect(countdown?.timerData.id).toBe("slide-A-<<5:00->>-0"); // content-based, no theft
+  });
+
+  it("binds each timer to its own state after a full document replacement", () => {
+    // After Google recreates the DOM no claimed marks survive. Even if only the
+    // countdown has rendered yet, its content-based id cannot alias the
+    // stopwatch's state persisted in the background under its own token id.
+    const partial = setFixture(textbox("<text>&lt;&lt;5:00-&gt;&gt;</text>"));
+    const [countdown] = resolveTimerAssignments(discoverTimerViews(partial), "slide-A", []);
+    expect(countdown.timerData.id).toBe("slide-A-<<5:00->>-0");
+
+    const full = setFixture(textbox(
+      "<text>&lt;&lt;0:00+&gt;&gt;</text><text>&lt;&lt;5:00-&gt;&gt;</text>"
+    ));
+    const assignments = resolveTimerAssignments(discoverTimerViews(full), "slide-A", []);
+    expect(assignments.map(({ timerData }) => timerData.id)).toEqual([
+      "slide-A-<<0:00+>>-0",
+      "slide-A-<<5:00->>-0" // same id as in the partial scan
+    ]);
+  });
+
+  it("does not adopt a claimed positional id minted for a different slide", () => {
+    const root = setFixture(textbox(
+      `<text data-slidetime-token="&lt;&lt;5:00-&gt;&gt;" data-slidetime-timer-id="slide-A-&lt;&lt;5:00-&gt;&gt;-0" data-slidetime-owned="1">4:59</text>`
+    ));
+
+    const assignments = resolveTimerAssignments(discoverTimerViews(root), "slide-B", []);
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0].timerData.id).toBe("slide-B-<<5:00->>-0");
   });
 
   it("still shares one id across views carrying the same id flag", () => {

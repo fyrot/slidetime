@@ -347,6 +347,10 @@ function disconnectPresentDocumentObserver() {
 }
 
 function pruneTimerViews() {
+  // a transiently missing present document must not wipe the view bindings;
+  // writes to disconnected nodes are harmless until a real document shows up
+  if (!presentDocument) { return; }
+
   for (const [timerId, views] of Object.entries(timerElmRecord)) {
     // isConnected alone is not enough: a node inside a stale, replaced iframe
     // document is still "connected" to that document

@@ -128,11 +128,13 @@ export interface TimerAssignment {
   timerData: TimerData
 }
 
-// Turn discovered views into timer specs with stable ids. Views that were
-// claimed on a previous scan keep the id stored on their display node, and
-// fresh positional (non-id-flag) timers never take an id that is already in
-// use — otherwise a late-rendering textbox could shift the ordinal ids and
-// bind two different timers to one state entry.
+// Turn discovered views into timer specs with stable ids. Timers with an id=
+// flag always get their deterministic shared id. Positional (non-id-flag)
+// timers get a content-based id — slide + token + ordinal among identical
+// tokens — so a partially rendered slide can never bind one timer's view to a
+// different timer's state (a purely ordinal id would shift with scan order).
+// Views claimed on a previous scan reuse the id stored on their display node,
+// but only when that id was minted for this slide.
 export function resolveTimerAssignments(
   views: DiscoveredView[],
   slideId: string,
@@ -151,27 +153,29 @@ export function resolveTimerAssignments(
     const parsed = parseTimerToken(view.tokenText);
     if (parsed == null) { continue; }
 
-    const claimedId = view.displayNode.getAttribute(TIMER_ID_ATTRIBUTE);
-    if (claimedId != null) {
-      assignments.push({
-        view,
-        timerData: { ...buildTimerData(parsed, tokenInd, slideId), id: claimedId }
-      });
-      tokenInd++;
-      continue;
-    }
-
-    let timerData = buildTimerData(parsed, tokenInd, slideId);
     const hasIdFlag = parsed.flags?.some((flag) => flag.type === TimerFlagType.ID);
-    if (!hasIdFlag) {
-      while (usedIds.has(timerData.id)) {
-        tokenInd++;
-        timerData = buildTimerData(parsed, tokenInd, slideId);
+    const claimedId = view.displayNode.getAttribute(TIMER_ID_ATTRIBUTE);
+
+    let id: string;
+    if (hasIdFlag) {
+      // deterministic shared id — recomputing beats trusting a stale attribute
+      id = buildTimerData(parsed, tokenInd, slideId).id;
+    } else if (claimedId != null && claimedId.startsWith(`${slideId}-`)) {
+      // claimed positional id from this slide; ids from other slides' scans
+      // (e.g. leftover nodes during a transition) must not alias state here
+      id = claimedId;
+    } else {
+      for (let ordinal = 0; ; ordinal++) {
+        id = `${slideId}-${view.tokenText}-${ordinal}`;
+        if (!usedIds.has(id)) { break; }
       }
     }
 
-    usedIds.add(timerData.id);
-    assignments.push({ view, timerData });
+    usedIds.add(id);
+    assignments.push({
+      view,
+      timerData: { ...buildTimerData(parsed, tokenInd, slideId), id }
+    });
     tokenInd++;
   }
 
