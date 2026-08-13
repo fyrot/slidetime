@@ -1,7 +1,6 @@
 import { formatTimer, getElapsedMs } from "~format-time";
 import type { PlasmoCSConfig } from "plasmo";
-import { claimView, discoverTimerViews } from "~content/extract-timers";
-import { buildTimerData, parseTimerToken } from "~parse-timers";
+import { claimView, discoverTimerViews, resolveTimerAssignments } from "~content/extract-timers";
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types";
 import { debugLog } from "~utils/debug-options";
 import { getAlarmSoundLocation } from "~popup/settings/alarmSounds";
@@ -16,6 +15,7 @@ const STATE_SYNC_INTERVAL = 5000;
 
 const INITIAL_RETRIES = 30;
 let extractRetries = 0;
+let pendingSlideId = ""; // slide the retry counter currently applies to
 
 // for selecting text nodes from rendered slide
 
@@ -225,15 +225,13 @@ function extractFromCurrentSlide(): boolean {
   pruneTimerViews();
 
   const foundTimers: TimerData[] = [];
-  let tokenInd = 0;
+  const assignments = resolveTimerAssignments(
+    discoverTimerViews(doc),
+    slideId,
+    Object.keys(timerElmRecord)
+  );
 
-  for (const view of discoverTimerViews(doc)) {
-    const tokenText = view.tokenText.replace(/\s+/g, "");
-    const parsedTimerToken = parseTimerToken(tokenText);
-
-    if (parsedTimerToken == null) { continue; }
-
-    const timerData = buildTimerData(parsedTimerToken, tokenInd, slideId);
+  for (const { view, timerData } of assignments) {
     claimView(view, timerData.id);
 
     if (!timerElmRecord[timerData.id]) {
@@ -245,13 +243,12 @@ function extractFromCurrentSlide(): boolean {
         blanks: view.blankNodes
       });
       foundTimers.push(timerData);
-      debugLog(`GFN Timer: discovered timer ${tokenText} -> ${timerData.id}`);
+      debugLog(`GFN Timer: discovered timer ${view.tokenText} -> ${timerData.id}`);
     }
-    tokenInd++;
   }
 
 
-  debugLog(`GFN Timer: Parsed ${tokenInd} timer tokens`);
+  debugLog(`GFN Timer: Parsed ${assignments.length} timer tokens`);
  
   if (foundTimers.length > 0) {
     debugLog(`GFN Timer: registering ${foundTimers.length} timer view(s)`);
@@ -351,7 +348,11 @@ function disconnectPresentDocumentObserver() {
 
 function pruneTimerViews() {
   for (const [timerId, views] of Object.entries(timerElmRecord)) {
-    timerElmRecord[timerId] = views.filter(({ display }) => display.isConnected);
+    // isConnected alone is not enough: a node inside a stale, replaced iframe
+    // document is still "connected" to that document
+    timerElmRecord[timerId] = views.filter(({ display }) =>
+      display.isConnected && display.ownerDocument === presentDocument
+    );
     if (timerElmRecord[timerId].length === 0) {
       delete timerElmRecord[timerId];
     }
@@ -392,6 +393,11 @@ function checkSlideChange() {
   }
 
   if (id !== currentSlideId) {
+    // each pending slide gets its own retry budget
+    if (pendingSlideId !== id) {
+      pendingSlideId = id;
+      extractRetries = 0;
+    }
     //debugLog("GFN Timer: slide changed from", currentSlideId, "to", id);
     debugLog(`GFN Timer: extraction attempt ${extractRetries + 1} for slide ${id}`)
     if (onSlideChanged()) {

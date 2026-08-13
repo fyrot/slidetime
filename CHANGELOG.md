@@ -10,6 +10,8 @@
 
 - Timer placeholders are now detected when Google Slides wraps them across multiple SVG text runs.
 - Present mode now retries extraction until slide text is rendered and re-scans after Google Slides recreates the slide DOM.
+- Shared timers hand off seamlessly when the destination slide's placeholder renders late: the brief deactivation gap is credited back, and a spurious `reset` zeroing in that window is undone.
+- Positional timer ids stay stable across re-scans, and stale views from replaced presentation documents are pruned.
 
 ## 1.3.2
 

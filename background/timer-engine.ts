@@ -38,12 +38,31 @@ export function verifyActiveTimers(
     const shouldBeRunning = isActiveSlide && !timer.paused;
     const wasRunning = timer.startedAt != null;
 
+    // A pending handoff is only redeemable while the slide it points at is still
+    // the active one; once the presentation moves on, the departure is final.
+    if (timer.pendingHandoff && timer.pendingHandoff.slideId !== activeSlideId) {
+      timer.pendingHandoff = null;
+    }
+
     // The running to not-running transition owns the bank/unbank of timer start data.
     if (shouldBeRunning && !wasRunning) {
       timer.startedAt = now;
+      // Slide changes are reported before the destination slide's tokens are
+      // extracted, so a timer that also lives on that slide briefly deactivates.
+      // If the slide it "left to" turns out to contain it (its registration
+      // arrives while that slide is still active), restore the banked value and
+      // credit the gap so the handoff is seamless. This also undoes a spurious
+      // reset-on-slide zeroing for that case.
+      if (timer.pendingHandoff && timer.pendingHandoff.slideId === activeSlideId) {
+        timer.accumulatedMs = timer.pendingHandoff.accumulatedMs + (now - timer.pendingHandoff.atMs);
+      }
+      timer.pendingHandoff = null;
     } else if (!shouldBeRunning && wasRunning) {
       timer.accumulatedMs += now - timer.startedAt;
       timer.startedAt = null;
+      if (!isActiveSlide) {
+        timer.pendingHandoff = { atMs: now, slideId: activeSlideId, accumulatedMs: timer.accumulatedMs };
+      }
     }
 
     // Reset-on-slide only applies when leaving the slide, not when pausing on it.

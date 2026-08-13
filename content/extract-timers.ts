@@ -1,4 +1,5 @@
-import { parseTimerToken } from "~parse-timers";
+import { buildTimerData, parseTimerToken } from "~parse-timers";
+import { TimerFlagType, type TimerData } from "~timer-types";
 
 const TEXTBOX_QUERY = "g.sketchy-text-content-text";
 const TOKEN_ATTRIBUTE = "data-slidetime-token";
@@ -47,54 +48,72 @@ export function discoverTimerViews(root: ParentNode): DiscoveredView[] {
       });
     }
 
-    const freshNodes = textNodes.filter((node) => !node.hasAttribute(OWNED_ATTRIBUTE));
-    let logicalText = "";
-    const characterNodeIndexes: number[] = [];
-    const nodeStarts: number[] = [];
-
-    for (let nodeIndex = 0; nodeIndex < freshNodes.length; nodeIndex++) {
-      const text = freshNodes[nodeIndex].textContent ?? "";
-      nodeStarts[nodeIndex] = logicalText.length;
-      logicalText += text;
-      for (let charIndex = 0; charIndex < text.length; charIndex++) {
-        characterNodeIndexes.push(nodeIndex);
+    // Owned nodes act as hard barriers: fresh nodes on either side of one are
+    // never joined, otherwise text runs separated by an already-claimed view
+    // could concatenate into a phantom token.
+    const freshRuns: SVGTextElement[][] = [];
+    let currentRun: SVGTextElement[] = [];
+    for (const node of textNodes) {
+      if (node.hasAttribute(OWNED_ATTRIBUTE)) {
+        if (currentRun.length > 0) { freshRuns.push(currentRun); currentRun = []; }
+      } else {
+        currentRun.push(node);
       }
     }
+    if (currentRun.length > 0) { freshRuns.push(currentRun); }
 
-    for (const match of logicalText.matchAll(TOKEN_CANDIDATE_REGEX)) {
-      const matchStart = match.index;
-      const matchEnd = matchStart + match[0].length;
-      const tokenText = match[0].replace(/\s+/g, "");
-      if (parseTimerToken(tokenText) == null) { continue; }
+    for (const freshNodes of freshRuns) {
+      let logicalText = "";
+      const characterNodeIndexes: number[] = [];
+      const nodeStarts: number[] = [];
 
-      const overlappingIndexes = Array.from(new Set(
-        characterNodeIndexes.slice(matchStart, matchEnd)
-      ));
-      if (overlappingIndexes.length === 0) { continue; }
-
-      const fullyConsumesOverlappingNodes = overlappingIndexes.every((nodeIndex) => {
+      for (let nodeIndex = 0; nodeIndex < freshNodes.length; nodeIndex++) {
         const text = freshNodes[nodeIndex].textContent ?? "";
-        const nodeStart = nodeStarts[nodeIndex];
-
+        nodeStarts[nodeIndex] = logicalText.length;
+        logicalText += text;
         for (let charIndex = 0; charIndex < text.length; charIndex++) {
-          if (/\s/.test(text[charIndex])) { continue; }
-          const logicalIndex = nodeStart + charIndex;
-          if (logicalIndex < matchStart || logicalIndex >= matchEnd) { return false; }
+          characterNodeIndexes.push(nodeIndex);
         }
-        return true;
-      });
-      if (!fullyConsumesOverlappingNodes) { continue; }
+      }
 
-      const overlappingNodes = overlappingIndexes.map((nodeIndex) => freshNodes[nodeIndex]);
-      const displayNode = overlappingNodes[0];
-      orderedViews.push({
-        nodeIndex: textNodes.indexOf(displayNode),
-        view: {
-          tokenText,
-          displayNode,
-          blankNodes: overlappingNodes.slice(1)
-        }
-      });
+      for (const match of logicalText.matchAll(TOKEN_CANDIDATE_REGEX)) {
+        const matchStart = match.index;
+        const matchEnd = matchStart + match[0].length;
+        // Keep the raw token: wrapping never inserts characters, and the parser
+        // already trims where upstream tolerated whitespace. Stripping here would
+        // silently merge ids like "alex smith" and "alexsmith".
+        const tokenText = match[0];
+        if (parseTimerToken(tokenText) == null) { continue; }
+
+        const overlappingIndexes = Array.from(new Set(
+          characterNodeIndexes.slice(matchStart, matchEnd)
+        ));
+        if (overlappingIndexes.length === 0) { continue; }
+
+        const fullyConsumesOverlappingNodes = overlappingIndexes.every((nodeIndex) => {
+          const text = freshNodes[nodeIndex].textContent ?? "";
+          const nodeStart = nodeStarts[nodeIndex];
+
+          for (let charIndex = 0; charIndex < text.length; charIndex++) {
+            if (/\s/.test(text[charIndex])) { continue; }
+            const logicalIndex = nodeStart + charIndex;
+            if (logicalIndex < matchStart || logicalIndex >= matchEnd) { return false; }
+          }
+          return true;
+        });
+        if (!fullyConsumesOverlappingNodes) { continue; }
+
+        const overlappingNodes = overlappingIndexes.map((nodeIndex) => freshNodes[nodeIndex]);
+        const displayNode = overlappingNodes[0];
+        orderedViews.push({
+          nodeIndex: textNodes.indexOf(displayNode),
+          view: {
+            tokenText,
+            displayNode,
+            blankNodes: overlappingNodes.slice(1)
+          }
+        });
+      }
     }
 
     orderedViews.sort((a, b) => a.nodeIndex - b.nodeIndex);
@@ -102,6 +121,61 @@ export function discoverTimerViews(root: ParentNode): DiscoveredView[] {
   }
 
   return discovered;
+}
+
+export interface TimerAssignment {
+  view: DiscoveredView
+  timerData: TimerData
+}
+
+// Turn discovered views into timer specs with stable ids. Views that were
+// claimed on a previous scan keep the id stored on their display node, and
+// fresh positional (non-id-flag) timers never take an id that is already in
+// use — otherwise a late-rendering textbox could shift the ordinal ids and
+// bind two different timers to one state entry.
+export function resolveTimerAssignments(
+  views: DiscoveredView[],
+  slideId: string,
+  recordedIds: Iterable<string>
+): TimerAssignment[] {
+  const usedIds = new Set(recordedIds);
+  for (const view of views) {
+    const claimedId = view.displayNode.getAttribute(TIMER_ID_ATTRIBUTE);
+    if (claimedId != null) { usedIds.add(claimedId); }
+  }
+
+  const assignments: TimerAssignment[] = [];
+  let tokenInd = 0;
+
+  for (const view of views) {
+    const parsed = parseTimerToken(view.tokenText);
+    if (parsed == null) { continue; }
+
+    const claimedId = view.displayNode.getAttribute(TIMER_ID_ATTRIBUTE);
+    if (claimedId != null) {
+      assignments.push({
+        view,
+        timerData: { ...buildTimerData(parsed, tokenInd, slideId), id: claimedId }
+      });
+      tokenInd++;
+      continue;
+    }
+
+    let timerData = buildTimerData(parsed, tokenInd, slideId);
+    const hasIdFlag = parsed.flags?.some((flag) => flag.type === TimerFlagType.ID);
+    if (!hasIdFlag) {
+      while (usedIds.has(timerData.id)) {
+        tokenInd++;
+        timerData = buildTimerData(parsed, tokenInd, slideId);
+      }
+    }
+
+    usedIds.add(timerData.id);
+    assignments.push({ view, timerData });
+    tokenInd++;
+  }
+
+  return assignments;
 }
 
 export function claimView(view: DiscoveredView, timerId: string): void {

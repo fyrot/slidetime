@@ -35,6 +35,10 @@ export interface TimerState extends TimerData {
   paused: boolean
   startedAt: number | null
   accumulatedMs: number
+  // set when the timer deactivates because the presentation moved to a slide
+  // not (yet) known to contain it; lets the engine make the handoff seamless
+  // if that slide's token registers a beat later (slow slide rendering)
+  pendingHandoff?: { atMs: number, slideId: string, accumulatedMs: number } | null
 }
 
 export interface TimerStates {

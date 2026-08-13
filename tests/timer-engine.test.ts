@@ -76,6 +76,62 @@ describe("timer engine", () => {
     expect(timers["countdown-reset"].enabled).toBe(false);
   });
 
+  it("credits the extraction gap when the destination slide registers late", () => {
+    // SLIDE_CHANGED(A2) arrives before A2's token is extracted, so alex briefly
+    // deactivates; once A2's registration lands the handoff must be seamless.
+    const timers: Record<string, TimerState> = {};
+    handleRegisterTimers(timers, [countdown("countdown-alex", "A1")], "A1", 0);
+
+    handleSlideChanged(timers, "A2", 20_000);
+    expect(timers["countdown-alex"].startedAt).toBeNull();
+
+    handleRegisterTimers(timers, [countdown("countdown-alex", "A2")], "A2", 20_400);
+    expect(timers["countdown-alex"].startedAt).toBe(20_400);
+    expect(timers["countdown-alex"].accumulatedMs).toBe(20_400); // 20s + the 400ms gap
+
+    handleSlideChanged(timers, "B1", 30_000);
+    expect(timers["countdown-alex"].accumulatedMs).toBe(30_000); // as if it never stopped
+  });
+
+  it("undoes a spurious reset when the destination slide registers late", () => {
+    const timers: Record<string, TimerState> = {};
+    handleRegisterTimers(timers, [countdown("countdown-reset", "A1", [
+      { type: TimerFlagType.RESET_ON_SLIDE }
+    ])], "A1", 0);
+
+    handleSlideChanged(timers, "A2", 8_000);
+    expect(timers["countdown-reset"].accumulatedMs).toBe(0); // reset applied on leave
+
+    handleRegisterTimers(timers, [countdown("countdown-reset", "A2", [
+      { type: TimerFlagType.RESET_ON_SLIDE }
+    ])], "A2", 8_300);
+    expect(timers["countdown-reset"].accumulatedMs).toBe(8_300); // restored + gap
+  });
+
+  it("does not credit a handoff once the presentation moved on", () => {
+    const timers: Record<string, TimerState> = {};
+    handleRegisterTimers(timers, [countdown("countdown-alex", "A")], "A", 0);
+
+    handleSlideChanged(timers, "B", 20_000); // pendingHandoff -> B
+    handleSlideChanged(timers, "C", 25_000); // departure is now final
+    handleSlideChanged(timers, "B", 30_000);
+    handleRegisterTimers(timers, [countdown("countdown-alex", "B")], "B", 120_000);
+
+    expect(timers["countdown-alex"].startedAt).toBe(120_000);
+    expect(timers["countdown-alex"].accumulatedMs).toBe(20_000); // no credit for B/C time
+  });
+
+  it("does not credit a handoff when returning to an earlier slide", () => {
+    const timers: Record<string, TimerState> = {};
+    handleRegisterTimers(timers, [countdown("countdown-alex", "A")], "A", 0);
+
+    handleSlideChanged(timers, "B", 20_000);
+    handleSlideChanged(timers, "A", 60_000);
+
+    expect(timers["countdown-alex"].startedAt).toBe(60_000);
+    expect(timers["countdown-alex"].accumulatedMs).toBe(20_000); // paused while away
+  });
+
   it("banks elapsed time and stops ticking when toggled paused", () => {
     const timers: Record<string, TimerState> = {};
     handleRegisterTimers(timers, [countdown("countdown-alex", "A")], "A", 1_000);
