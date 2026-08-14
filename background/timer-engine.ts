@@ -1,9 +1,11 @@
 import { TimerFlagType, type TimerData, type TimerState } from "~timer-types";
 
+export const HANDOFF_GRACE_MS = 2000;
+
 export function handleRegisterTimers(
   timerStateRecord: Record<string, TimerState>,
   timers: TimerData[],
-  activeSlideId: string,
+  visibleIds: ReadonlySet<string>,
   now: number
 ): void {
   for (const timer of timers) {
@@ -16,7 +18,7 @@ export function handleRegisterTimers(
         accumulatedMs: 0
       };
     } else {
-      // If already present, include this new slide id as another "home".
+      // Keep every observed slide id as debugging/id-minting metadata.
       for (const slideId of timer.slideIds) {
         if (!timerStateRecord[timer.id].slideIds.includes(slideId)) {
           timerStateRecord[timer.id].slideIds.push(slideId);
@@ -25,71 +27,50 @@ export function handleRegisterTimers(
     }
   }
 
-  verifyActiveTimers(timerStateRecord, activeSlideId, now);
+  applyVisibleTimers(timerStateRecord, visibleIds, now);
 }
 
-export function verifyActiveTimers(
+export function applyVisibleTimers(
   timerStateRecord: Record<string, TimerState>,
-  activeSlideId: string,
+  visibleIds: ReadonlySet<string>,
   now: number
 ): void {
   for (const timer of Object.values(timerStateRecord)) {
-    const isActiveSlide = timer.slideIds.includes(activeSlideId);
-    const shouldBeRunning = isActiveSlide && !timer.paused;
+    const isVisible = visibleIds.has(timer.id);
+    const shouldRun = isVisible && !timer.paused;
     const wasRunning = timer.startedAt != null;
 
-    // A pending handoff is only redeemable while the slide it points at is still
-    // the active one; once the presentation moves on, the departure is final.
-    if (timer.pendingHandoff && timer.pendingHandoff.slideId !== activeSlideId) {
-      timer.pendingHandoff = null;
-    }
-
-    // The running to not-running transition owns the bank/unbank of timer start data.
-    if (shouldBeRunning && !wasRunning) {
+    if (shouldRun && !wasRunning) {
       timer.startedAt = now;
-      // Slide changes are reported before the destination slide's tokens are
-      // extracted, so a timer that also lives on that slide briefly deactivates.
-      // If the slide it "left to" turns out to contain it (its registration
-      // arrives while that slide is still active), restore the banked value and
-      // credit the gap so the handoff is seamless. This also undoes a spurious
-      // reset-on-slide zeroing for that case.
-      if (timer.pendingHandoff && timer.pendingHandoff.slideId === activeSlideId) {
+      // A brief render gap is treated as a seamless handoff. Restoring the
+      // stashed value also undoes reset-on-leave zeroing for that brief gap.
+      if (timer.pendingHandoff && now - timer.pendingHandoff.atMs <= HANDOFF_GRACE_MS) {
         timer.accumulatedMs = timer.pendingHandoff.accumulatedMs + (now - timer.pendingHandoff.atMs);
       }
       timer.pendingHandoff = null;
-    } else if (!shouldBeRunning && wasRunning) {
+    } else if (!shouldRun && wasRunning) {
       timer.accumulatedMs += now - timer.startedAt;
       timer.startedAt = null;
-      if (!isActiveSlide) {
-        timer.pendingHandoff = { atMs: now, slideId: activeSlideId, accumulatedMs: timer.accumulatedMs };
+      if (!isVisible) {
+        timer.pendingHandoff = { atMs: now, accumulatedMs: timer.accumulatedMs };
+        if (timer.flags?.some(f => f.type === TimerFlagType.RESET_ON_SLIDE)) {
+          timer.accumulatedMs = 0;
+        }
       }
     }
 
-    // Reset-on-slide only applies when leaving the slide, not when pausing on it.
-    if (!isActiveSlide && timer.enabled && timer.flags?.some(f => f.type === TimerFlagType.RESET_ON_SLIDE)) {
-      timer.accumulatedMs = 0;
-    }
-
-    timer.enabled = isActiveSlide;
+    timer.enabled = isVisible;
   }
 }
 
-export function handleSlideChanged(
+export function handleToggleVisiblePause(
   timerStateRecord: Record<string, TimerState>,
-  newSlideId: string,
-  now: number
-): void {
-  verifyActiveTimers(timerStateRecord, newSlideId, now);
-}
-
-export function handleToggleSlidePause(
-  timerStateRecord: Record<string, TimerState>,
-  activeSlideId: string,
+  visibleIds: ReadonlySet<string>,
   now: number
 ): boolean {
   const targets = Object.values(timerStateRecord).filter(
     (timer) =>
-      timer.slideIds.includes(activeSlideId) &&
+      visibleIds.has(timer.id) &&
       (timer.timerType === "countdown" || timer.timerType === "stopwatch")
   );
   if (targets.length === 0) { return false; }
@@ -102,7 +83,7 @@ export function handleToggleSlidePause(
     timer.paused = nextPaused;
   }
 
-  verifyActiveTimers(timerStateRecord, activeSlideId, now);
+  applyVisibleTimers(timerStateRecord, visibleIds, now);
   return true;
 }
 

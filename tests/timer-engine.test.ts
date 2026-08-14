@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  HANDOFF_GRACE_MS,
+  applyVisibleTimers,
   handleRegisterTimers,
-  handleSlideChanged,
-  handleToggleSlidePause
+  handleToggleVisiblePause
 } from "~background/timer-engine";
 import { TimerFlagType, type AppliedFlag, type TimerData, type TimerState } from "~timer-types";
 
@@ -11,134 +12,124 @@ function countdown(id: string, slideId: string, flags?: AppliedFlag[]): TimerDat
   return { id, timerType: "countdown", duration: 300, slideIds: [slideId], flags };
 }
 
+function visible(...timerIds: string[]): ReadonlySet<string> {
+  return new Set(timerIds);
+}
+
 describe("timer engine", () => {
-  it("shares one elapsed-time budget across every slide carrying an id", () => {
+  it("shares one elapsed-time budget across changing visible sets", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A1")], "", 0);
-    handleSlideChanged(timers, "A1", 0);
+    handleRegisterTimers(timers, [countdown("alex", "A1")], visible("alex"), 0);
 
-    handleSlideChanged(timers, "A2", 20_000);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(20_000);
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A2")], "A2", 20_000);
+    applyVisibleTimers(timers, visible(), 20_000);
+    expect(timers.alex.accumulatedMs).toBe(20_000);
+    expect(timers.alex.pendingHandoff).toEqual({ atMs: 20_000, accumulatedMs: 20_000 });
 
-    handleSlideChanged(timers, "B1", 50_000);
-    handleRegisterTimers(timers, [countdown("countdown-bob", "B1")], "B1", 50_000);
-    expect(300 - timers["countdown-alex"].accumulatedMs / 1000).toBe(250);
-    expect(timers["countdown-alex"].startedAt).toBeNull();
+    applyVisibleTimers(timers, visible("alex"), 20_300);
+    expect(timers.alex.accumulatedMs).toBe(20_300);
 
-    handleSlideChanged(timers, "A2", 60_000);
-    expect(timers["countdown-bob"].accumulatedMs).toBe(10_000);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(50_000);
-    expect(timers["countdown-alex"].startedAt).toBe(60_000);
+    handleRegisterTimers(timers, [countdown("bob", "B1")], visible("bob"), 50_000);
+    expect(timers.alex.accumulatedMs).toBe(50_000);
+    expect(timers.alex.startedAt).toBeNull();
+    expect(timers.bob.startedAt).toBe(50_000);
+
+    applyVisibleTimers(timers, visible("alex"), 60_000);
+    expect(timers.alex.accumulatedMs).toBe(50_000);
+    expect(timers.alex.startedAt).toBe(60_000);
+    expect(timers.bob.accumulatedMs).toBe(10_000);
+    expect(timers.bob.startedAt).toBeNull();
   });
 
-  it("does not reset state when the same id is registered again", () => {
+  it("credits a visibility gap exactly at the handoff grace boundary", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A1")], "A1", 0);
-    handleSlideChanged(timers, "B1", 12_000);
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A2")], "B1", 12_000);
+    handleRegisterTimers(timers, [countdown("alex", "A")], visible("alex"), 0);
+    applyVisibleTimers(timers, visible(), 10_000);
+    applyVisibleTimers(timers, visible("alex"), 10_000 + HANDOFF_GRACE_MS);
 
-    expect(Object.keys(timers)).toEqual(["countdown-alex"]);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(12_000);
-    expect(timers["countdown-alex"].slideIds).toEqual(["A1", "A2"]);
+    expect(timers.alex.accumulatedMs).toBe(10_000 + HANDOFF_GRACE_MS);
+    expect(timers.alex.pendingHandoff).toBeNull();
   });
 
-  it("collapses two placeholders with the same id into one state entry", () => {
+  it("does not credit a visibility gap beyond the handoff grace boundary", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [
-      countdown("countdown-alex", "A1"),
-      countdown("countdown-alex", "A1")
-    ], "A1", 0);
+    handleRegisterTimers(timers, [countdown("alex", "A")], visible("alex"), 0);
+    applyVisibleTimers(timers, visible(), 10_000);
+    applyVisibleTimers(timers, visible("alex"), 10_000 + HANDOFF_GRACE_MS + 1);
 
-    expect(Object.keys(timers)).toEqual(["countdown-alex"]);
-    expect(timers["countdown-alex"].slideIds).toEqual(["A1"]);
+    expect(timers.alex.accumulatedMs).toBe(10_000);
+    expect(timers.alex.pendingHandoff).toBeNull();
   });
 
-  it("keeps exact accounting across zero-duration A to B to A changes", () => {
+  it("restores and credits reset-on-slide state after a brief render gap", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A")], "A", 100);
-    handleSlideChanged(timers, "B", 100);
-    handleSlideChanged(timers, "A", 100);
-
-    expect(timers["countdown-alex"].accumulatedMs).toBe(0);
-    expect(timers["countdown-alex"].startedAt).toBe(100);
-  });
-
-  it("zeroes accumulated time when a reset timer leaves its slide", () => {
-    const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-reset", "A", [
+    handleRegisterTimers(timers, [countdown("reset", "A", [
       { type: TimerFlagType.RESET_ON_SLIDE }
-    ])], "A", 0);
-    handleSlideChanged(timers, "B", 8_000);
+    ])], visible("reset"), 0);
 
-    expect(timers["countdown-reset"].accumulatedMs).toBe(0);
-    expect(timers["countdown-reset"].startedAt).toBeNull();
-    expect(timers["countdown-reset"].enabled).toBe(false);
+    applyVisibleTimers(timers, visible(), 8_000);
+    expect(timers.reset.accumulatedMs).toBe(0);
+    expect(timers.reset.pendingHandoff).toEqual({ atMs: 8_000, accumulatedMs: 8_000 });
+
+    applyVisibleTimers(timers, visible("reset"), 8_300);
+    expect(timers.reset.accumulatedMs).toBe(8_300);
   });
 
-  it("credits the extraction gap when the destination slide registers late", () => {
-    // SLIDE_CHANGED(A2) arrives before A2's token is extracted, so alex briefly
-    // deactivates; once A2's registration lands the handoff must be seamless.
+  it("keeps reset-on-slide state at zero after a long render gap", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A1")], "A1", 0);
-
-    handleSlideChanged(timers, "A2", 20_000);
-    expect(timers["countdown-alex"].startedAt).toBeNull();
-
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A2")], "A2", 20_400);
-    expect(timers["countdown-alex"].startedAt).toBe(20_400);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(20_400); // 20s + the 400ms gap
-
-    handleSlideChanged(timers, "B1", 30_000);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(30_000); // as if it never stopped
-  });
-
-  it("undoes a spurious reset when the destination slide registers late", () => {
-    const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-reset", "A1", [
+    handleRegisterTimers(timers, [countdown("reset", "A", [
       { type: TimerFlagType.RESET_ON_SLIDE }
-    ])], "A1", 0);
+    ])], visible("reset"), 0);
 
-    handleSlideChanged(timers, "A2", 8_000);
-    expect(timers["countdown-reset"].accumulatedMs).toBe(0); // reset applied on leave
+    applyVisibleTimers(timers, visible(), 8_000);
+    applyVisibleTimers(timers, visible("reset"), 8_000 + HANDOFF_GRACE_MS + 1);
 
-    handleRegisterTimers(timers, [countdown("countdown-reset", "A2", [
-      { type: TimerFlagType.RESET_ON_SLIDE }
-    ])], "A2", 8_300);
-    expect(timers["countdown-reset"].accumulatedMs).toBe(8_300); // restored + gap
+    expect(timers.reset.accumulatedMs).toBe(0);
+    expect(timers.reset.startedAt).toBe(8_000 + HANDOFF_GRACE_MS + 1);
   });
 
-  it("does not credit a handoff once the presentation moved on", () => {
+  it("pauses without creating a handoff and resumes without crediting the paused span", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A")], "A", 0);
+    handleRegisterTimers(timers, [countdown("alex", "A")], visible("alex"), 1_000);
 
-    handleSlideChanged(timers, "B", 20_000); // pendingHandoff -> B
-    handleSlideChanged(timers, "C", 25_000); // departure is now final
-    handleSlideChanged(timers, "B", 30_000);
-    handleRegisterTimers(timers, [countdown("countdown-alex", "B")], "B", 120_000);
+    expect(handleToggleVisiblePause(timers, visible("alex"), 6_000)).toBe(true);
+    expect(timers.alex.paused).toBe(true);
+    expect(timers.alex.accumulatedMs).toBe(5_000);
+    expect(timers.alex.startedAt).toBeNull();
+    expect(timers.alex.pendingHandoff).toBeNull();
 
-    expect(timers["countdown-alex"].startedAt).toBe(120_000);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(20_000); // no credit for B/C time
+    expect(handleToggleVisiblePause(timers, visible("alex"), 16_000)).toBe(true);
+    expect(timers.alex.paused).toBe(false);
+    expect(timers.alex.accumulatedMs).toBe(5_000);
+    expect(timers.alex.startedAt).toBe(16_000);
   });
 
-  it("does not credit a handoff when returning to an earlier slide", () => {
+  it("pauses all visible countdowns and stopwatches together", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A")], "A", 0);
+    const stopwatch: TimerData = {
+      id: "watch",
+      timerType: "stopwatch",
+      duration: 0,
+      slideIds: ["A"]
+    };
+    handleRegisterTimers(
+      timers,
+      [countdown("count", "A"), stopwatch],
+      visible("count", "watch"),
+      0
+    );
 
-    handleSlideChanged(timers, "B", 20_000);
-    handleSlideChanged(timers, "A", 60_000);
-
-    expect(timers["countdown-alex"].startedAt).toBe(60_000);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(20_000); // paused while away
+    expect(handleToggleVisiblePause(timers, visible("count", "watch"), 5_000)).toBe(true);
+    expect(timers.count.paused).toBe(true);
+    expect(timers.watch.paused).toBe(true);
+    expect(timers.count.accumulatedMs).toBe(5_000);
+    expect(timers.watch.accumulatedMs).toBe(5_000);
   });
 
-  it("banks elapsed time and stops ticking when toggled paused", () => {
+  it("returns false when no visible countdown or stopwatch can be toggled", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [countdown("countdown-alex", "A")], "A", 1_000);
+    handleRegisterTimers(timers, [countdown("alex", "A")], visible(), 0);
 
-    expect(handleToggleSlidePause(timers, "A", 6_000)).toBe(true);
-    expect(timers["countdown-alex"].paused).toBe(true);
-    expect(timers["countdown-alex"].accumulatedMs).toBe(5_000);
-    expect(timers["countdown-alex"].startedAt).toBeNull();
+    expect(handleToggleVisiblePause(timers, visible(), 5_000)).toBe(false);
+    expect(timers.alex.paused).toBe(false);
   });
 });

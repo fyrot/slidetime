@@ -133,8 +133,8 @@ export interface TimerAssignment {
 // timers get a content-based id — slide + token + ordinal among identical
 // tokens — so a partially rendered slide can never bind one timer's view to a
 // different timer's state (a purely ordinal id would shift with scan order).
-// Views claimed on a previous scan reuse the id stored on their display node,
-// but only when that id was minted for this slide.
+// Views claimed on a previous scan always reuse the id stored on their display
+// node, pinning identity to the rendered view at first discovery.
 export function resolveTimerAssignments(
   views: DiscoveredView[],
   slideId: string,
@@ -160,9 +160,7 @@ export function resolveTimerAssignments(
     if (hasIdFlag) {
       // deterministic shared id — recomputing beats trusting a stale attribute
       id = buildTimerData(parsed, tokenInd, slideId).id;
-    } else if (claimedId != null && claimedId.startsWith(`${slideId}-`)) {
-      // claimed positional id from this slide; ids from other slides' scans
-      // (e.g. leftover nodes during a transition) must not alias state here
+    } else if (claimedId != null) {
       id = claimedId;
     } else {
       for (let ordinal = 0; ; ordinal++) {

@@ -1,7 +1,7 @@
 import {
+  applyVisibleTimers,
   handleRegisterTimers,
-  handleSlideChanged,
-  handleToggleSlidePause,
+  handleToggleVisiblePause,
   resetTimerStates
 } from "~background/timer-engine";
 import { TimerMessage, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
@@ -16,12 +16,12 @@ import { debugLog } from "~utils/debug-options";
 // move this interface to its own file later
 interface SlidesSession {
   port: chrome.runtime.Port // we open up a listener with each slides port
-  activeSlideId: string,
+  visibleTimerIds: string[],
   timerStateRecord: Record<string, TimerState>
 }
 
 interface PersistedSession {
-  activeSlideId: string,
+  visibleTimerIds: string[],
   timerStateRecord: Record<string, TimerState>
 }
 
@@ -41,7 +41,7 @@ function sessionKey(tabId: number): string {
 
 async function persistSession(tabId: number, session: SlidesSession) {
   const persistedData: PersistedSession = {
-    activeSlideId: session.activeSlideId,
+    visibleTimerIds: session.visibleTimerIds,
     timerStateRecord: session.timerStateRecord
   };
 
@@ -75,11 +75,11 @@ async function registerPort(port: chrome.runtime.Port) {
       const persisted: PersistedSession | undefined = stored[sessionKey(tabId)];
       allSessions[tabId] = {
         port,
-        activeSlideId: persisted?.activeSlideId ?? "",
+        visibleTimerIds: persisted?.visibleTimerIds ?? [],
         timerStateRecord: persisted?.timerStateRecord ?? {}
       };
     } catch {
-      allSessions[tabId] = { port, activeSlideId: "", timerStateRecord: {} };
+      allSessions[tabId] = { port, visibleTimerIds: [], timerStateRecord: {} };
     }
 
     for (const msg of pendingMessages[tabId] ?? []) {
@@ -95,18 +95,22 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
   // yet another non-null assertion
 
   switch (msg.messageType) {
-    case TimerMessage.SLIDE_CHANGED:
-      currentSession.activeSlideId = msg.slideId;
-      handleSlideChanged(currentSession.timerStateRecord, msg.slideId, Date.now());
+    case TimerMessage.VISIBLE_TIMERS:
+      currentSession.visibleTimerIds = msg.timerIds;
+      applyVisibleTimers(
+        currentSession.timerStateRecord,
+        new Set(currentSession.visibleTimerIds),
+        Date.now()
+      );
       persistSession(tabId, currentSession);
-      debugLog("Slide changed");
+      debugLog("Visible timers changed");
       break;
     case TimerMessage.REGISTER_TIMERS:
       debugLog("-- (Registering) --");
       handleRegisterTimers(
         currentSession.timerStateRecord,
         msg.timers,
-        currentSession.activeSlideId,
+        new Set(currentSession.visibleTimerIds),
         Date.now()
       );
       debugLog("-- (Registered) -- ");
@@ -117,13 +121,13 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
       break;
     case TimerMessage.RESET_SESSION:
       resetTimerStates(currentSession.timerStateRecord);
-      currentSession.activeSlideId = "";
+      currentSession.visibleTimerIds = [];
       chrome.storage.session.remove(sessionKey(tabId));
       break;
     case TimerMessage.TOGGLE_SLIDE_PAUSE:
-      if (handleToggleSlidePause(
+      if (handleToggleVisiblePause(
         currentSession.timerStateRecord,
-        currentSession.activeSlideId,
+        new Set(currentSession.visibleTimerIds),
         Date.now()
       )) {
         persistSession(tabId, currentSession);
@@ -141,4 +145,3 @@ function handleGetTimerStates(session: SlidesSession) {
   };
   session.port.postMessage(retrieved);
 }
-

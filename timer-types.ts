@@ -1,5 +1,5 @@
 export enum TimerMessage {
-  SLIDE_CHANGED = "SLIDE_CHANGED",
+  VISIBLE_TIMERS = "VISIBLE_TIMERS",
   REGISTER_TIMERS = "REGISTER_TIMERS",
   GET_TIMER_STATES = "GET_TIMER_STATES",
   RESET_SESSION = "RESET_SESSION",
@@ -24,7 +24,9 @@ export type AppliedFlag =
 export interface TimerData {
   id: string
   timerType: TimerType
-  slideIds: string[] // google presents the slide id in the url "hash"
+  // Kept as registration/debugging metadata and an id-minting namespace only;
+  // slide ids no longer drive timer activation.
+  slideIds: string[]
 
   duration?: number
   flags?: AppliedFlag[]
@@ -35,10 +37,8 @@ export interface TimerState extends TimerData {
   paused: boolean
   startedAt: number | null
   accumulatedMs: number
-  // set when the timer deactivates because the presentation moved to a slide
-  // not (yet) known to contain it; lets the engine make the handoff seamless
-  // if that slide's token registers a beat later (slow slide rendering)
-  pendingHandoff?: { atMs: number, slideId: string, accumulatedMs: number } | null
+  // Lets brief visibility gaps during slide transitions stay seamless.
+  pendingHandoff?: { atMs: number, accumulatedMs: number } | null
 }
 
 export interface TimerStates {
@@ -48,9 +48,9 @@ export interface TimerStates {
 
 // messaging interfaces
 
-export interface SlideChangedMessage {
-  messageType: TimerMessage.SLIDE_CHANGED,
-  slideId: string // no need for self identification bc we'll be listening to the tab/presentation sending -- implicit param essentially
+export interface VisibleTimersMessage {
+  messageType: TimerMessage.VISIBLE_TIMERS,
+  timerIds: string[]
 }
 
 export interface RegisterTimersMessage {
@@ -76,7 +76,7 @@ export interface ToggleSlidePauseMessage {
 }
 
 export type TimerMessaging =
-  | SlideChangedMessage
+  | VisibleTimersMessage
   | RegisterTimersMessage
   | GetTimerStatesMessage
   | ResetSessionMessage

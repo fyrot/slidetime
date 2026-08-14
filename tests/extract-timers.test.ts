@@ -152,14 +152,14 @@ describe("resolveTimerAssignments", () => {
     ]);
   });
 
-  it("does not adopt a claimed positional id minted for a different slide", () => {
+  it("reuses a claimed positional id regardless of which slide minted it", () => {
     const root = setFixture(textbox(
       `<text data-slidetime-token="&lt;&lt;5:00-&gt;&gt;" data-slidetime-timer-id="slide-A-&lt;&lt;5:00-&gt;&gt;-0" data-slidetime-owned="1">4:59</text>`
     ));
 
     const assignments = resolveTimerAssignments(discoverTimerViews(root), "slide-B", []);
     expect(assignments).toHaveLength(1);
-    expect(assignments[0].timerData.id).toBe("slide-B-<<5:00->>-0");
+    expect(assignments[0].timerData.id).toBe("slide-A-<<5:00->>-0");
   });
 
   it("still shares one id across views carrying the same id flag", () => {

@@ -1,47 +1,71 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  handleRegisterTimers,
-  handleSlideChanged
+  applyVisibleTimers,
+  handleRegisterTimers
 } from "~background/timer-engine";
 import type { TimerData, TimerState } from "~timer-types";
 
-const timer: TimerData = {
-  id: "countdown-alex",
-  timerType: "countdown",
-  duration: 300,
-  slideIds: ["A"]
-};
+function timer(slideId = "A"): TimerData {
+  return {
+    id: "countdown-alex",
+    timerType: "countdown",
+    duration: 300,
+    slideIds: [slideId]
+  };
+}
+
+function visible(...timerIds: string[]): ReadonlySet<string> {
+  return new Set(timerIds);
+}
 
 describe("timer lifecycle message ordering", () => {
-  it("starts on register when SLIDE_CHANGED arrived first", () => {
+  it("starts on register when visibility arrived first", () => {
     const timers: Record<string, TimerState> = {};
-    const activeSlideId = "A";
-    handleSlideChanged(timers, activeSlideId, 1_000);
-    handleRegisterTimers(timers, [timer], activeSlideId, 1_500);
+    const registeredTimer = timer();
+    const visibleIds = visible(registeredTimer.id);
+    applyVisibleTimers(timers, visibleIds, 1_000);
+    handleRegisterTimers(timers, [registeredTimer], visibleIds, 1_500);
 
-    expect(timers[timer.id].startedAt).toBe(1_500);
-    expect(timers[timer.id].enabled).toBe(true);
+    expect(timers[registeredTimer.id].startedAt).toBe(1_500);
+    expect(timers[registeredTimer.id].enabled).toBe(true);
   });
 
-  it("starts on slide change when REGISTER_TIMERS arrived first", () => {
+  it("starts on visibility when registration arrived first", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [timer], "", 1_000);
-    expect(timers[timer.id].startedAt).toBeNull();
+    const registeredTimer = timer();
+    handleRegisterTimers(timers, [registeredTimer], visible(), 1_000);
+    expect(timers[registeredTimer.id].startedAt).toBeNull();
 
-    handleSlideChanged(timers, "A", 1_500);
-    expect(timers[timer.id].startedAt).toBe(1_500);
+    applyVisibleTimers(timers, visible(registeredTimer.id), 1_500);
+    expect(timers[registeredTimer.id].startedAt).toBe(1_500);
   });
 
-  it("never replaces a concurrent start time or double-counts elapsed time", () => {
+  it("never resets accumulated time or restarts a duplicate registration", () => {
     const timers: Record<string, TimerState> = {};
-    handleRegisterTimers(timers, [timer], "A", 100);
-    handleSlideChanged(timers, "A", 200);
-    handleRegisterTimers(timers, [timer], "A", 250);
+    const registeredTimer = timer();
+    handleRegisterTimers(timers, [registeredTimer], visible(registeredTimer.id), 100);
+    applyVisibleTimers(timers, visible(), 200);
+    applyVisibleTimers(timers, visible(registeredTimer.id), 300);
+    handleRegisterTimers(timers, [timer("B")], visible(registeredTimer.id), 350);
 
-    expect(timers[timer.id].startedAt).toBe(100);
-    handleSlideChanged(timers, "B", 300);
-    expect(timers[timer.id].accumulatedMs).toBe(200);
-    expect(timers[timer.id].startedAt).toBeNull();
+    expect(timers[registeredTimer.id].accumulatedMs).toBe(200);
+    expect(timers[registeredTimer.id].startedAt).toBe(300);
+    expect(timers[registeredTimer.id].slideIds).toEqual(["A", "B"]);
+
+    applyVisibleTimers(timers, visible(), 400);
+    expect(timers[registeredTimer.id].accumulatedMs).toBe(300);
+    expect(timers[registeredTimer.id].startedAt).toBeNull();
+  });
+
+  it("collapses two same-id placeholders into one state entry", () => {
+    const timers: Record<string, TimerState> = {};
+    const firstView = timer();
+    const secondView = timer();
+    handleRegisterTimers(timers, [firstView, secondView], visible(firstView.id), 100);
+
+    expect(Object.keys(timers)).toEqual([firstView.id]);
+    expect(timers[firstView.id].startedAt).toBe(100);
+    expect(timers[firstView.id].slideIds).toEqual(["A"]);
   });
 });
