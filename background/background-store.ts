@@ -103,6 +103,9 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
         Date.now()
       );
       persistSession(tabId, currentSession);
+      // push fresh state immediately: a snapshot cached before a timer started
+      // would otherwise freeze its display until the next 5s sync
+      handleGetTimerStates(currentSession);
       debugLog("Visible timers changed");
       break;
     case TimerMessage.REGISTER_TIMERS:
@@ -115,6 +118,7 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
       );
       debugLog("-- (Registered) -- ");
       persistSession(tabId, currentSession);
+      handleGetTimerStates(currentSession);
       break;
     case TimerMessage.GET_TIMER_STATES:
       handleGetTimerStates(currentSession);

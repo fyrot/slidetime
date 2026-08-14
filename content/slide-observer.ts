@@ -51,7 +51,6 @@ let mutationExtractTimeout: number | null = null;
 
 // moving to content scripts acting on caches from the background store 
 let slideCheckInterval: number | null = null;
-let slideCheckStartTimeout: number | null = null;
 let stateSyncInterval: number | null = null;
 let renderLoopId: number | null = null;
 let cachedTimerStates: TimerStates | null = null;
@@ -140,15 +139,11 @@ function enterPresentMode() {
   extractRetries = 0;
   lastSentVisibleIds = null;
 
-  // slide change detection, operates on a faster interval for "responsiveness"
-  if (!slideCheckInterval && slideCheckStartTimeout == null) {
+  // slide change detection + visibility sampling; starts immediately — the
+  // old 500ms warm-up delay just left a dead zone at presentation start
+  if (!slideCheckInterval) {
     checkSlideChange(); // run immediately on enter
-    slideCheckStartTimeout = window.setTimeout(() => {
-      slideCheckStartTimeout = null;
-      if (!inPresentMode || slideCheckInterval) { return; }
-      slideCheckInterval = window.setInterval(() => {checkSlideChange();}, VISIBILITY_CHECK_INTERVAL);
-    }, 500);
-
+    slideCheckInterval = window.setInterval(() => {checkSlideChange();}, VISIBILITY_CHECK_INTERVAL);
   }
   // slower interval state sync to refresh cached states from background store
   // -> also serves as a heartbeat to keep the service worker alive
@@ -205,11 +200,6 @@ function exitPresentMode() {
 
 
   // clear all active intervals | slideChange, stateSync, render
-
-  if (slideCheckStartTimeout != null) {
-    clearTimeout(slideCheckStartTimeout);
-    slideCheckStartTimeout = null;
-  }
 
   if (slideCheckInterval) {
     clearInterval(slideCheckInterval);
