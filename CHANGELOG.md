@@ -1,5 +1,19 @@
 # Changelog 
 
+## Unreleased
+
+### Added
+
+- Added automated parser, wrapped-token discovery, lifecycle, and timer-engine tests.
+
+### Fixed
+
+- Timer placeholders are now detected when Google Slides wraps them across multiple SVG text runs.
+- Present mode now retries extraction until slide text is rendered and re-scans after Google Slides recreates the slide DOM.
+- Shared timers hand off seamlessly when the destination slide's placeholder renders late: the brief deactivation gap is credited back, and a spurious `reset` zeroing in that window is undone.
+- Positional timer ids stay stable across re-scans, and stale views from replaced presentation documents are pruned.
+- Timer activation is now driven by actual on-screen visibility of the rendered placeholder instead of URL slide-id bookkeeping, fixing timers that needed several slide visits to start or stopped sporadically (Google's viewer pre-renders neighboring slides and updates the URL and DOM asynchronously, so slide-id attribution was unreliable).
+
 ## 1.3.2
 
 ### Added
@@ -101,4 +115,3 @@ All items listed *underneath* a version header are associated with that version 
 - Scroll behavior in the popup now returns to the top of the page when navigating between menus. 
 
 ## 1.0.0 (Initial release)
-

@@ -1,5 +1,5 @@
 export enum TimerMessage {
-  SLIDE_CHANGED = "SLIDE_CHANGED",
+  VISIBLE_TIMERS = "VISIBLE_TIMERS",
   REGISTER_TIMERS = "REGISTER_TIMERS",
   GET_TIMER_STATES = "GET_TIMER_STATES",
   RESET_SESSION = "RESET_SESSION",
@@ -24,7 +24,9 @@ export type AppliedFlag =
 export interface TimerData {
   id: string
   timerType: TimerType
-  slideIds: string[] // google presents the slide id in the url "hash"
+  // Kept as registration/debugging metadata and an id-minting namespace only;
+  // slide ids no longer drive timer activation.
+  slideIds: string[]
 
   duration?: number
   flags?: AppliedFlag[]
@@ -35,6 +37,10 @@ export interface TimerState extends TimerData {
   paused: boolean
   startedAt: number | null
   accumulatedMs: number
+  // Lets brief visibility gaps during slide transitions stay seamless.
+  // `running` records whether the timer was ticking when it went invisible;
+  // only a running gap is credited back on restore.
+  pendingHandoff?: { atMs: number, accumulatedMs: number, running: boolean } | null
 }
 
 export interface TimerStates {
@@ -44,9 +50,9 @@ export interface TimerStates {
 
 // messaging interfaces
 
-export interface SlideChangedMessage {
-  messageType: TimerMessage.SLIDE_CHANGED,
-  slideId: string // no need for self identification bc we'll be listening to the tab/presentation sending -- implicit param essentially
+export interface VisibleTimersMessage {
+  messageType: TimerMessage.VISIBLE_TIMERS,
+  timerIds: string[]
 }
 
 export interface RegisterTimersMessage {
@@ -69,10 +75,13 @@ export interface HeartbeatMessage {
 
 export interface ToggleSlidePauseMessage {
   messageType: TimerMessage.TOGGLE_SLIDE_PAUSE
+  // visible ids sampled at keypress time; fresher than the background's copy,
+  // which lags by up to one visibility poll
+  timerIds?: string[]
 }
 
 export type TimerMessaging =
-  | SlideChangedMessage
+  | VisibleTimersMessage
   | RegisterTimersMessage
   | GetTimerStatesMessage
   | ResetSessionMessage

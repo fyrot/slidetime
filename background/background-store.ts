@@ -1,4 +1,10 @@
-import { TimerMessage, TimerFlagType, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
+import {
+  applyVisibleTimers,
+  handleRegisterTimers,
+  handleToggleVisiblePause,
+  resetTimerStates
+} from "~background/timer-engine";
+import { TimerMessage, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types"
 import { debugLog } from "~utils/debug-options";
 
 
@@ -10,12 +16,12 @@ import { debugLog } from "~utils/debug-options";
 // move this interface to its own file later
 interface SlidesSession {
   port: chrome.runtime.Port // we open up a listener with each slides port
-  activeSlideId: string,
+  visibleTimerIds: string[],
   timerStateRecord: Record<string, TimerState>
 }
 
 interface PersistedSession {
-  activeSlideId: string,
+  visibleTimerIds: string[],
   timerStateRecord: Record<string, TimerState>
 }
 
@@ -35,7 +41,7 @@ function sessionKey(tabId: number): string {
 
 async function persistSession(tabId: number, session: SlidesSession) {
   const persistedData: PersistedSession = {
-    activeSlideId: session.activeSlideId,
+    visibleTimerIds: session.visibleTimerIds,
     timerStateRecord: session.timerStateRecord
   };
 
@@ -69,11 +75,11 @@ async function registerPort(port: chrome.runtime.Port) {
       const persisted: PersistedSession | undefined = stored[sessionKey(tabId)];
       allSessions[tabId] = {
         port,
-        activeSlideId: persisted?.activeSlideId ?? "",
+        visibleTimerIds: persisted?.visibleTimerIds ?? [],
         timerStateRecord: persisted?.timerStateRecord ?? {}
       };
     } catch {
-      allSessions[tabId] = { port, activeSlideId: "", timerStateRecord: {} };
+      allSessions[tabId] = { port, visibleTimerIds: [], timerStateRecord: {} };
     }
 
     for (const msg of pendingMessages[tabId] ?? []) {
@@ -89,115 +95,63 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
   // yet another non-null assertion
 
   switch (msg.messageType) {
-    case TimerMessage.SLIDE_CHANGED:
-      handleSlideChanged(currentSession, tabId, msg.slideId);
+    case TimerMessage.VISIBLE_TIMERS:
+      currentSession.visibleTimerIds = msg.timerIds;
+      applyVisibleTimers(
+        currentSession.timerStateRecord,
+        new Set(currentSession.visibleTimerIds),
+        Date.now()
+      );
+      persistSession(tabId, currentSession);
+      // push fresh state immediately: a snapshot cached before a timer started
+      // would otherwise freeze its display until the next 5s sync
+      handleGetTimerStates(currentSession);
+      debugLog("Visible timers changed");
       break;
     case TimerMessage.REGISTER_TIMERS:
-      handleRegisterTimers(currentSession, tabId, msg.timers);
+      debugLog("-- (Registering) --");
+      handleRegisterTimers(
+        currentSession.timerStateRecord,
+        msg.timers,
+        new Set(currentSession.visibleTimerIds),
+        Date.now()
+      );
+      debugLog("-- (Registered) -- ");
+      persistSession(tabId, currentSession);
+      handleGetTimerStates(currentSession);
       break;
     case TimerMessage.GET_TIMER_STATES:
       handleGetTimerStates(currentSession);
       break;
     case TimerMessage.RESET_SESSION:
-      handleResetSession(currentSession, tabId);
+      resetTimerStates(currentSession.timerStateRecord);
+      currentSession.visibleTimerIds = [];
+      chrome.storage.session.remove(sessionKey(tabId));
       break;
     case TimerMessage.TOGGLE_SLIDE_PAUSE:
-      handleToggleSlidePause(currentSession, tabId);
+      // prefer the keypress-time sample over our copy, which lags by one poll
+      if (handleToggleVisiblePause(
+        currentSession.timerStateRecord,
+        new Set(msg.timerIds ?? currentSession.visibleTimerIds),
+        Date.now()
+      )) {
+        persistSession(tabId, currentSession);
+        // Push fresh state so render reflects the toggle without waiting on the 5s sync heartbeat.
+        handleGetTimerStates(currentSession);
+      }
       break;
   }
 }
 
-
-function handleRegisterTimers(session: SlidesSession, tabId: number, timers: TimerData[]) {
-  debugLog("-- (Registering) --");
-  for (const timer of timers) {
-    if (!session.timerStateRecord[timer.id]) {
-      session.timerStateRecord[timer.id] = {
-        ...timer,
-        enabled: false,
-        paused: false,
-        startedAt: null,
-        accumulatedMs: 0
-      };
-      debugLog("Registered new timer");
-    } else {
-      // if already present, across all stored records include this new slide id as a "home"
-      for (const slideId of timer.slideIds) {
-        if (!session.timerStateRecord[timer.id].slideIds.includes(slideId)) {
-          session.timerStateRecord[timer.id].slideIds.push(slideId);
-        }
-      }
-    }
-  }
-  debugLog("-- (Registered) -- ");
-  verifyActiveTimers(session, tabId);
-}
-
-function verifyActiveTimers(session: SlidesSession, tabId: number) {
-  for (const timer of Object.values(session.timerStateRecord)) {
-
-    const isActiveSlide = timer.slideIds.includes(session.activeSlideId);
-    const shouldBeRunning = isActiveSlide && !timer.paused;
-    const wasRunning = timer.startedAt != null;
-
-    // the running to not-running transition owns the bank/unbank of timer start data
-    if (shouldBeRunning && !wasRunning) {
-      timer.startedAt = Date.now();
-    } else if (!shouldBeRunning && wasRunning) {
-      timer.accumulatedMs += Date.now() - (timer.startedAt as number);
-      timer.startedAt = null;
-    }
-
-    // reset-on-slide only applies when leaving the slide, not when pausing on it
-    // NOTE: this is currently undocumented in the reference
-    if (!isActiveSlide && timer.enabled && timer.flags?.some(f => f.type === TimerFlagType.RESET_ON_SLIDE)) {
-      timer.accumulatedMs = 0;
-    }
-
-    timer.enabled = isActiveSlide;
-  }
-
-  persistSession(tabId, session);
-}
-
-function handleToggleSlidePause(session: SlidesSession, tabId: number) {
-  const targets = Object.values(session.timerStateRecord).filter(
-    (t) =>
-      t.slideIds.includes(session.activeSlideId) &&
-      (t.timerType === "countdown" || t.timerType === "stopwatch")
-  );
-  if (targets.length === 0) { return; }
-
-  // if any targeted timer is currently running, pause all; else resume all
-  const anyRunning = targets.some((t) => !t.paused);
-  const nextPaused = anyRunning;
-
-  for (const timer of targets) {
-    timer.paused = nextPaused;
-  }
-
-  verifyActiveTimers(session, tabId);
-
-  // push fresh state so render reflects the toggle without waiting on the 5s sync heartbeat interval we already have set up
-  handleGetTimerStates(session);
-}
-
-function handleSlideChanged(session: SlidesSession, tabId: number, newSlideId: string) {
-  session.activeSlideId = newSlideId;
-  verifyActiveTimers(session, tabId);
-  debugLog("Slide changed");
-}
 
 function handleGetTimerStates(session: SlidesSession) {
   const retrieved: TimerStates = {
     timers: Object.values(session.timerStateRecord)
   };
-  session.port.postMessage(retrieved);
+  try {
+    session.port.postMessage(retrieved);
+  } catch {
+    // the tab closed or navigated with a push in flight; onDisconnect will
+    // clean the session up — nothing to do here
+  }
 }
-
-function handleResetSession(session: SlidesSession, tabId: number) {
-  session.timerStateRecord = {};
-  session.activeSlideId = "";
-  chrome.storage.session.remove(sessionKey(tabId));
-}
-

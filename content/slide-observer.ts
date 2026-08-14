@@ -1,6 +1,7 @@
 import { formatTimer, getElapsedMs } from "~format-time";
 import type { PlasmoCSConfig } from "plasmo";
-import { buildTimerData, parseTimerToken } from "~parse-timers";
+import { claimView, discoverTimerViews, resolveTimerAssignments } from "~content/extract-timers";
+import { computeVisibleTimerIds, isViewVisible } from "~content/view-visibility";
 import { TimerMessage, type TimerData, type TimerMessaging, type TimerState, type TimerStates } from "~timer-types";
 import { debugLog } from "~utils/debug-options";
 import { getAlarmSoundLocation } from "~popup/settings/alarmSounds";
@@ -10,17 +11,26 @@ import { getAlarmSoundLocation } from "~popup/settings/alarmSounds";
 debugLog("GFN Timer: content script injected");
 
 // variable interval ping definitions
-const SLIDE_CHANGED_INTERVAL = 100; // 0.1s
+const VISIBILITY_CHECK_INTERVAL = 100; // 0.1s
 const STATE_SYNC_INTERVAL = 5000;
 
-const INITIAL_RETRIES = 10;
+const INITIAL_RETRIES = 30;
 let extractRetries = 0;
+let pendingSlideId = ""; // slide the retry counter currently applies to
 
 // for selecting text nodes from rendered slide
 
 const TEXT_NODE_QUERY = "g.sketchy-text-content-text > text";
 
-const timerElmRecord: Record<string, SVGTextElement[]> = {};
+interface TimerView {
+  display: SVGTextElement
+  blanks: SVGTextElement[]
+}
+
+const timerElmRecord: Record<string, TimerView[]> = {};
+// specs of everything we ever registered this session, so a port reconnect
+// with lost background state can re-register instead of stranding visible ids
+const registeredTimerSpecs: Record<string, TimerData> = {};
 const firedSet = new Set<string>();
 const soundFiredSet = new Set<string>();
 
@@ -35,12 +45,18 @@ const PAUSE_PLAY_KEY = "y";
 let currentSlideId = "";
 let inPresentMode = false;
 let presentDocument: Document | null = null;
+let presentDocumentObserver: MutationObserver | null = null;
+let observedPresentDocument: Document | null = null;
+let mutationExtractTimeout: number | null = null;
+const MUTATION_EXTRACT_COOLDOWN = 100;
+let lastMutationExtractAt = 0;
 
 // moving to content scripts acting on caches from the background store 
 let slideCheckInterval: number | null = null;
 let stateSyncInterval: number | null = null;
 let renderLoopId: number | null = null;
 let cachedTimerStates: TimerStates | null = null;
+let lastSentVisibleIds: string[] | null = null;
 
 
 
@@ -69,15 +85,39 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-let port = makePort();
+// The port exists ONLY while presenting. Holding one open on editor pages made
+// every idle MV3 service-worker suspension fire a disconnect/reconnect churn
+// loop, and an extension reload left orphaned content scripts throwing
+// "Attempting to use a disconnected port object" on their next postMessage.
+let port: chrome.runtime.Port | null = null;
+let contextGoneLogged = false;
 
-function makePort() {
+function ensurePort(): chrome.runtime.Port {
+  if (port) { return port; }
+
   const newPort = chrome.runtime.connect({ name: PORT_NAME });
-  
-  // auto reconnect
+  port = newPort;
+
   newPort.onDisconnect.addListener(() => {
+    if (port !== newPort) { return; } // an explicit disconnect already replaced it
+    port = null;
     currentSlideId = "";
-    port = makePort();
+    lastSentVisibleIds = null;
+    if (!inPresentMode) { return; }
+
+    // the background may have lost its session (e.g. worker restart); re-register
+    // everything we know so visible ids always have state behind them. Deferred
+    // out of the disconnect event; the next 100ms tick republishes visibility.
+    const specs = Object.values(registeredTimerSpecs);
+    if (specs.length > 0) {
+      setTimeout(() => {
+        if (!inPresentMode) { return; }
+        postToBackground({
+          messageType: TimerMessage.REGISTER_TIMERS,
+          timers: specs
+        });
+      }, 0);
+    }
   })
 
   // render loop now acts on cached timer states
@@ -87,7 +127,39 @@ function makePort() {
   });
 
   return newPort;
+}
 
+// Never throws: an extension reload invalidates this content script's runtime,
+// and any port can die between creation and use — both must degrade to a
+// dropped message, not an uncaught error in the page.
+function postToBackground(message: TimerMessaging): boolean {
+  if (!chrome.runtime?.id) {
+    if (!contextGoneLogged) {
+      contextGoneLogged = true;
+      debugLog("GFN Timer: extension context invalidated (reloaded?); refresh the tab");
+    }
+    return false;
+  }
+
+  try {
+    ensurePort().postMessage(message);
+    return true;
+  } catch {
+    port = null; // stale port; retry once on a fresh connection
+    try {
+      ensurePort().postMessage(message);
+      return true;
+    } catch {
+      port = null;
+      return false;
+    }
+  }
+}
+
+function dropPort() {
+  const oldPort = port;
+  port = null;
+  try { oldPort?.disconnect(); } catch { /* already gone */ }
 }
 
 
@@ -113,20 +185,19 @@ function enterPresentMode() {
   inPresentMode = true;
   currentSlideId = "";
   extractRetries = 0;
+  lastSentVisibleIds = null;
 
-  // slide change detection, operates on a faster interval for "responsiveness"
+  // slide change detection + visibility sampling; starts immediately — the
+  // old 500ms warm-up delay just left a dead zone at presentation start
   if (!slideCheckInterval) {
     checkSlideChange(); // run immediately on enter
-    setTimeout(() => {
-      slideCheckInterval = setInterval(() => {checkSlideChange();}, SLIDE_CHANGED_INTERVAL);
-    }, 500);
-    
+    slideCheckInterval = window.setInterval(() => {checkSlideChange();}, VISIBILITY_CHECK_INTERVAL);
   }
   // slower interval state sync to refresh cached states from background store
   // -> also serves as a heartbeat to keep the service worker alive
   if (!stateSyncInterval) {
     getTimerStates();
-    stateSyncInterval = setInterval(getTimerStates, STATE_SYNC_INTERVAL);
+    stateSyncInterval = window.setInterval(getTimerStates, STATE_SYNC_INTERVAL);
   }
 
    
@@ -156,17 +227,28 @@ function exitPresentMode() {
   firedSet.clear();
   soundFiredSet.clear();
 
+  // Explicitly deactivate everything before deleting the background session.
+  publishVisibleTimerIds([], false, true);
+
   // clear stale element and document references so re-entering present mode rescans
   for (const key of Object.keys(timerElmRecord)) {
     delete timerElmRecord[key];
   }
+  for (const key of Object.keys(registeredTimerSpecs)) {
+    delete registeredTimerSpecs[key];
+  }
   // presentDocument removal now is here
+  disconnectPresentDocumentObserver();
   presentDocument = null;
 
   const messageContent: TimerMessaging = {
     messageType: TimerMessage.RESET_SESSION
   };
-  port.postMessage(messageContent);
+  postToBackground(messageContent);
+
+  // no port outside present mode — otherwise every idle service-worker
+  // suspension churns a disconnect/reconnect loop on editor pages
+  dropPort();
 
 
   // clear all active intervals | slideChange, stateSync, render
@@ -194,11 +276,7 @@ function getCurrentSlideId(): string {
 }
 
 function extractFromCurrentSlide(): boolean {
-  const slideId = getCurrentSlideId();
-  if (!slideId) {
-    debugLog("GFN Timer: extract -> no slideId");
-    return false;
-  }
+  const slideId = getCurrentSlideId() || "deck";
 
   const doc = getPresentDocument();
   if (!doc) {
@@ -207,55 +285,80 @@ function extractFromCurrentSlide(): boolean {
   }
 
   const allTextNodes = doc.querySelectorAll<SVGTextElement>(TEXT_NODE_QUERY);
+  if (allTextNodes.length === 0) {
+    debugLog(`GFN Timer: extract -> slide ${slideId} not ready (no rendered text nodes)`);
+    return false;
+  }
+
+  pruneTimerViews();
+
   const foundTimers: TimerData[] = [];
-  let tokenInd = 0;
+  const assignments = resolveTimerAssignments(
+    discoverTimerViews(doc),
+    slideId,
+    Object.keys(timerElmRecord)
+  );
 
-  for (const textNode of allTextNodes) {
-    const text = textNode.textContent ?? "";
-    const parsedTimerToken = parseTimerToken(text);
+  for (const { view, timerData } of assignments) {
+    claimView(view, timerData.id);
+    registeredTimerSpecs[timerData.id] = timerData;
 
-    if (parsedTimerToken == null) { continue; }
-    
-    const timerData = buildTimerData(parsedTimerToken, tokenInd, slideId);
     if (!timerElmRecord[timerData.id]) {
       timerElmRecord[timerData.id] = [];
     }
-    if (!timerElmRecord[timerData.id].includes(textNode)) {
-      timerElmRecord[timerData.id].push(textNode);
+    if (!hasRecordedDisplay(view.displayNode)) {
+      timerElmRecord[timerData.id].push({
+        display: view.displayNode,
+        blanks: view.blankNodes
+      });
       foundTimers.push(timerData);
+      debugLog(`GFN Timer: discovered timer ${view.tokenText} -> ${timerData.id}`);
     }
-    tokenInd++;
   }
 
 
-  debugLog(`GFN Timer: Parsed ${tokenInd} timer tokens`);
+  debugLog(`GFN Timer: Parsed ${assignments.length} timer tokens`);
  
   if (foundTimers.length > 0) {
+    debugLog(`GFN Timer: registering ${foundTimers.length} timer view(s)`);
     const messageContent:TimerMessaging = {
       messageType: TimerMessage.REGISTER_TIMERS,
       timers: foundTimers
     };
 
-    port.postMessage(messageContent);
+    postToBackground(messageContent);
   }
+
+  updateVisibleTimers();
+
+  // paint newly claimed views right now from the cached states — the correct
+  // ticking state follows on the background's push a few ms later
+  renderTimerViews();
 
   return true;
 }
 
+function publishVisibleTimerIds(timerIds: string[], requestStates = true, force = false): boolean {
+  const unchanged = lastSentVisibleIds != null &&
+    lastSentVisibleIds.length === timerIds.length &&
+    lastSentVisibleIds.every((timerId, index) => timerId === timerIds[index]);
+  if (unchanged && !force) { return false; }
 
-function onSlideChanged(): boolean {
-  // we'll go with polling for this; in case google engineers change how the dom renders slides
-  //  this is a more robust, stable method that will likely require less dev intervention
-  const slideId = getCurrentSlideId();
-  const extracted = extractFromCurrentSlide();
-  const messageContent:TimerMessaging = {
-    messageType: TimerMessage.SLIDE_CHANGED,
-    slideId: slideId
+  lastSentVisibleIds = [...timerIds];
+  const messageContent: TimerMessaging = {
+    messageType: TimerMessage.VISIBLE_TIMERS,
+    timerIds
   };
+  postToBackground(messageContent);
+  debugLog(`GFN Timer: visible timers -> [${timerIds.join(", ")}]`);
+  if (requestStates) {
+    getTimerStates();
+  }
+  return true;
+}
 
-  port.postMessage(messageContent);
-
-  return extracted;
+function updateVisibleTimers(): boolean {
+  return publishVisibleTimerIds(computeVisibleTimerIds(timerElmRecord, isViewVisible));
 }
 
 function getTimerStates() {
@@ -264,26 +367,106 @@ function getTimerStates() {
     messageType: TimerMessage.GET_TIMER_STATES
   }
 
-  port.postMessage(messageContent);
+  postToBackground(messageContent);
 }
 
 function getPresentDocument(): Document | null {
-  
-  if (presentDocument?.querySelector(PRESENT_MODE_QUERY)) {
-    return presentDocument;
-  }
-
   // we gotta iterate through each iframe and get its document to access the present mode text
   for (const iframe of document.querySelectorAll("iframe")) {
+    // skip hidden/zero-size frames (e.g. presenter view helpers) so visibility
+    // checks run against the iframe the audience actually sees
+    const frameRect = iframe.getBoundingClientRect();
+    if (frameRect.width <= 0 || frameRect.height <= 0) { continue; }
+    if (iframe.checkVisibility?.() === false) { continue; }
+
     const doc = iframe.contentDocument;
     if (doc?.querySelector(PRESENT_MODE_QUERY)) {
-      presentDocument = doc;
+      if (presentDocument !== doc) {
+        presentDocument = doc;
+      }
+      attachPresentDocumentObserver(doc);
       return doc;
     }
   }
 
+  disconnectPresentDocumentObserver();
   presentDocument = null;
   return null;
+}
+
+function runMutationExtract() {
+  if (!inPresentMode) { return; }
+  debugLog(`GFN Timer: re-extract-on-mutation for slide ${getCurrentSlideId() || "deck"}`);
+  if (extractFromCurrentSlide()) {
+    getTimerStates();
+  }
+}
+
+function attachPresentDocumentObserver(doc: Document) {
+  if (observedPresentDocument === doc || !doc.body) { return; }
+
+  disconnectPresentDocumentObserver();
+  presentDocumentObserver = new MutationObserver((mutations) => {
+    const includesExternalMutation = mutations.some((mutation) => {
+      const target = mutation.target.nodeType === 1
+        ? mutation.target as Element
+        : mutation.target.parentElement;
+      return !target?.closest?.("[data-slidetime-owned]");
+    });
+    if (!includesExternalMutation) { return; }
+
+    // Leading edge: extract right away when a burst begins (this is the path a
+    // freshly rendered slide takes, so it decides the switch latency), with a
+    // short cooldown so mutation storms cannot thrash extraction. The trailing
+    // pass still runs to catch nodes rendered later in the burst.
+    const now = Date.now();
+    if (now - lastMutationExtractAt >= MUTATION_EXTRACT_COOLDOWN) {
+      lastMutationExtractAt = now;
+      runMutationExtract();
+    }
+    if (mutationExtractTimeout == null) {
+      mutationExtractTimeout = window.setTimeout(() => {
+        mutationExtractTimeout = null;
+        lastMutationExtractAt = Date.now();
+        runMutationExtract();
+      }, 150);
+    }
+  });
+  presentDocumentObserver.observe(doc.body, { childList: true, subtree: true });
+  observedPresentDocument = doc;
+}
+
+function disconnectPresentDocumentObserver() {
+  presentDocumentObserver?.disconnect();
+  presentDocumentObserver = null;
+  observedPresentDocument = null;
+  if (mutationExtractTimeout != null) {
+    clearTimeout(mutationExtractTimeout);
+    mutationExtractTimeout = null;
+  }
+}
+
+function pruneTimerViews() {
+  // a transiently missing present document must not wipe the view bindings;
+  // writes to disconnected nodes are harmless until a real document shows up
+  if (!presentDocument) { return; }
+
+  for (const [timerId, views] of Object.entries(timerElmRecord)) {
+    // isConnected alone is not enough: a node inside a stale, replaced iframe
+    // document is still "connected" to that document
+    timerElmRecord[timerId] = views.filter(({ display }) =>
+      display.isConnected && display.ownerDocument === presentDocument
+    );
+    if (timerElmRecord[timerId].length === 0) {
+      delete timerElmRecord[timerId];
+    }
+  }
+}
+
+function hasRecordedDisplay(displayNode: SVGTextElement): boolean {
+  return Object.values(timerElmRecord).some((views) =>
+    views.some(({ display }) => display === displayNode)
+  );
 }
 
 function isInPresentMode(): boolean {
@@ -295,34 +478,55 @@ function isInPresentMode(): boolean {
 function checkSlideChange() {
   if (!inPresentMode) return;
 
-  const id = getCurrentSlideId();
-  if (id !== currentSlideId) {
-    //debugLog("GFN Timer: slide changed from", currentSlideId, "to", id);
-    const doc = getPresentDocument();
-    if (!doc) { return; }
-
+  const id = getCurrentSlideId() || "deck";
+  const previousPresentDocument = presentDocument;
+  const doc = getPresentDocument();
+  if (doc) {
     // iframe is ready — retry pause listener attach if the setting is on and it wasn't attached at enter time
     if (currentOptions?.pausePlayTimers) {
       attachPauseListener();
     }
 
-    debugLog("trying..")
-    if (onSlideChanged()) {
-      debugLog("onslidechanged hit");
-      currentSlideId = id;
-      extractRetries = 0;
-      getTimerStates();
-    } else if (extractRetries++ > INITIAL_RETRIES) {
-      debugLog("extract retry limit hit");
-      currentSlideId = id;
-      extractRetries = 0;
-      getTimerStates();
+    const presentDocumentChanged = doc !== previousPresentDocument;
+    if (presentDocumentChanged && id === currentSlideId) {
+      debugLog(`GFN Timer: re-extract-on-document-change for slide ${id}`);
+      if (extractFromCurrentSlide()) {
+        getTimerStates();
+      }
     }
-    
+
+    if (id !== currentSlideId) {
+      // each pending slide gets its own retry budget
+      if (pendingSlideId !== id) {
+        pendingSlideId = id;
+        extractRetries = 0;
+      }
+      //debugLog("GFN Timer: slide changed from", currentSlideId, "to", id);
+      debugLog(`GFN Timer: extraction attempt ${extractRetries + 1} for slide ${id}`)
+      if (extractFromCurrentSlide()) {
+        debugLog(`GFN Timer: extraction ready for slide ${id}`);
+        currentSlideId = id;
+        extractRetries = 0;
+        getTimerStates();
+      } else {
+        extractRetries++;
+        debugLog(`GFN Timer: extraction not ready for slide ${id}; retry ${extractRetries}/${INITIAL_RETRIES}`);
+        if (extractRetries >= INITIAL_RETRIES) {
+          debugLog(`GFN Timer: extraction retry limit hit for slide ${id}`);
+          currentSlideId = id;
+          extractRetries = 0;
+          getTimerStates();
+        }
+      }
+    }
   }
+
+  // Visibility drives activation and is intentionally sampled at this 100ms
+  // cadence, not in the animation-frame render loop.
+  updateVisibleTimers();
 }
 
-// pause/play functionality, toggles all timers (type countdown or stopwatch) on the current slide.
+// pause/play functionality, toggles visible timers (type countdown or stopwatch).
 // keydown focus lives inside the present-mode iframe
 // that doc materializes lazily, so we rely on check slide change in order to add it 
 let pauseListenerDoc: Document | null = null;
@@ -335,9 +539,13 @@ function onPauseKeydown(e: KeyboardEvent) {
   // redundant check because it will only be registered in present mode
   if (!inPresentMode) { return; }
 
-  // toggle logic is handled in background store
-  const messageContent: TimerMessaging = { messageType: TimerMessage.TOGGLE_SLIDE_PAUSE };
-  port.postMessage(messageContent);
+  // toggle logic is handled in background store; sample visibility fresh at
+  // keypress so a mid-transition poll lag cannot pause the wrong timer
+  const messageContent: TimerMessaging = {
+    messageType: TimerMessage.TOGGLE_SLIDE_PAUSE,
+    timerIds: computeVisibleTimerIds(timerElmRecord, isViewVisible)
+  };
+  postToBackground(messageContent);
 }
 
 function attachPauseListener() {
@@ -416,26 +624,38 @@ function checkAutoAdvance(timerState: TimerState) {
   }
 }
 
-// now we can render our updates by accessing animation frames, snappy, responsive updates
+// single render pass — called every animation frame, and synchronously right
+// after extraction so a freshly claimed view paints from cache immediately
+// instead of waiting for the next frame or a background round trip
+function renderTimerViews() {
+  pruneTimerViews();
+
+  if (cachedTimerStates) {
+    for (const timerState of cachedTimerStates.timers) {
+      const views = timerElmRecord[timerState.id];
+      if (!views) { continue; }
+
+      const formatted = formatTimer(timerState, currentOptions);
+      for (const view of views) {
+        // skip the write when unchanged: every textContent assignment replaces the
+        // text child node, which needlessly churns the present-document observer
+        if (view.display.textContent !== formatted) {
+          view.display.textContent = formatted;
+        }
+      }
+      checkAutoAdvance(timerState);
+      checkZeroSound(timerState);
+    }
+  }
+}
+
 function renderLoop() {
   if (!inPresentMode) {
     renderLoopId = null;
     return;
   }
 
-  if (cachedTimerStates) {
-    for (const timerState of cachedTimerStates.timers) {
-      const nodeRefs = timerElmRecord[timerState.id];
-      if (!nodeRefs) { continue; }
-
-      const formatted = formatTimer(timerState, currentOptions);
-      for (const nodeRef of nodeRefs) {
-        nodeRef.textContent = formatted;
-      }
-      checkAutoAdvance(timerState);
-      checkZeroSound(timerState);
-    }
-  }
+  renderTimerViews();
 
   renderLoopId = requestAnimationFrame(renderLoop);
 }
