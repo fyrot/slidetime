@@ -83,24 +83,38 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-let port = makePort();
+// The port exists ONLY while presenting. Holding one open on editor pages made
+// every idle MV3 service-worker suspension fire a disconnect/reconnect churn
+// loop, and an extension reload left orphaned content scripts throwing
+// "Attempting to use a disconnected port object" on their next postMessage.
+let port: chrome.runtime.Port | null = null;
+let contextGoneLogged = false;
 
-function makePort() {
+function ensurePort(): chrome.runtime.Port {
+  if (port) { return port; }
+
   const newPort = chrome.runtime.connect({ name: PORT_NAME });
-  
-  // auto reconnect
+  port = newPort;
+
   newPort.onDisconnect.addListener(() => {
+    if (port !== newPort) { return; } // an explicit disconnect already replaced it
+    port = null;
     currentSlideId = "";
     lastSentVisibleIds = null;
-    port = makePort();
-    // the background may have lost its session (e.g. storage unavailable);
-    // re-register everything we know so visible ids always have state behind them
+    if (!inPresentMode) { return; }
+
+    // the background may have lost its session (e.g. worker restart); re-register
+    // everything we know so visible ids always have state behind them. Deferred
+    // out of the disconnect event; the next 100ms tick republishes visibility.
     const specs = Object.values(registeredTimerSpecs);
     if (specs.length > 0) {
-      port.postMessage({
-        messageType: TimerMessage.REGISTER_TIMERS,
-        timers: specs
-      } satisfies TimerMessaging);
+      setTimeout(() => {
+        if (!inPresentMode) { return; }
+        postToBackground({
+          messageType: TimerMessage.REGISTER_TIMERS,
+          timers: specs
+        });
+      }, 0);
     }
   })
 
@@ -111,7 +125,39 @@ function makePort() {
   });
 
   return newPort;
+}
 
+// Never throws: an extension reload invalidates this content script's runtime,
+// and any port can die between creation and use — both must degrade to a
+// dropped message, not an uncaught error in the page.
+function postToBackground(message: TimerMessaging): boolean {
+  if (!chrome.runtime?.id) {
+    if (!contextGoneLogged) {
+      contextGoneLogged = true;
+      debugLog("GFN Timer: extension context invalidated (reloaded?); refresh the tab");
+    }
+    return false;
+  }
+
+  try {
+    ensurePort().postMessage(message);
+    return true;
+  } catch {
+    port = null; // stale port; retry once on a fresh connection
+    try {
+      ensurePort().postMessage(message);
+      return true;
+    } catch {
+      port = null;
+      return false;
+    }
+  }
+}
+
+function dropPort() {
+  const oldPort = port;
+  port = null;
+  try { oldPort?.disconnect(); } catch { /* already gone */ }
 }
 
 
@@ -196,7 +242,11 @@ function exitPresentMode() {
   const messageContent: TimerMessaging = {
     messageType: TimerMessage.RESET_SESSION
   };
-  port.postMessage(messageContent);
+  postToBackground(messageContent);
+
+  // no port outside present mode — otherwise every idle service-worker
+  // suspension churns a disconnect/reconnect loop on editor pages
+  dropPort();
 
 
   // clear all active intervals | slideChange, stateSync, render
@@ -274,7 +324,7 @@ function extractFromCurrentSlide(): boolean {
       timers: foundTimers
     };
 
-    port.postMessage(messageContent);
+    postToBackground(messageContent);
   }
 
   updateVisibleTimers();
@@ -293,7 +343,7 @@ function publishVisibleTimerIds(timerIds: string[], requestStates = true, force 
     messageType: TimerMessage.VISIBLE_TIMERS,
     timerIds
   };
-  port.postMessage(messageContent);
+  postToBackground(messageContent);
   debugLog(`GFN Timer: visible timers -> [${timerIds.join(", ")}]`);
   if (requestStates) {
     getTimerStates();
@@ -311,7 +361,7 @@ function getTimerStates() {
     messageType: TimerMessage.GET_TIMER_STATES
   }
 
-  port.postMessage(messageContent);
+  postToBackground(messageContent);
 }
 
 function getPresentDocument(): Document | null {
@@ -476,7 +526,7 @@ function onPauseKeydown(e: KeyboardEvent) {
     messageType: TimerMessage.TOGGLE_SLIDE_PAUSE,
     timerIds: computeVisibleTimerIds(timerElmRecord, isViewVisible)
   };
-  port.postMessage(messageContent);
+  postToBackground(messageContent);
 }
 
 function attachPauseListener() {
