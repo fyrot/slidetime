@@ -38,7 +38,9 @@ export interface TimerState extends TimerData {
   startedAt: number | null
   accumulatedMs: number
   // Lets brief visibility gaps during slide transitions stay seamless.
-  pendingHandoff?: { atMs: number, accumulatedMs: number } | null
+  // `running` records whether the timer was ticking when it went invisible;
+  // only a running gap is credited back on restore.
+  pendingHandoff?: { atMs: number, accumulatedMs: number, running: boolean } | null
 }
 
 export interface TimerStates {
@@ -73,6 +75,9 @@ export interface HeartbeatMessage {
 
 export interface ToggleSlidePauseMessage {
   messageType: TimerMessage.TOGGLE_SLIDE_PAUSE
+  // visible ids sampled at keypress time; fresher than the background's copy,
+  // which lags by up to one visibility poll
+  timerIds?: string[]
 }
 
 export type TimerMessaging =

@@ -125,9 +125,10 @@ function handleMessage(tabId: number, msg: TimerMessaging) {
       chrome.storage.session.remove(sessionKey(tabId));
       break;
     case TimerMessage.TOGGLE_SLIDE_PAUSE:
+      // prefer the keypress-time sample over our copy, which lags by one poll
       if (handleToggleVisiblePause(
         currentSession.timerStateRecord,
-        new Set(currentSession.visibleTimerIds),
+        new Set(msg.timerIds ?? currentSession.visibleTimerIds),
         Date.now()
       )) {
         persistSession(tabId, currentSession);

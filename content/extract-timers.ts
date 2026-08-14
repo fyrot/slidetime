@@ -27,7 +27,10 @@ export function discoverTimerViews(root: ParentNode): DiscoveredView[] {
 
     // Claimed views have already had their visible text replaced. Recover their
     // original token from attributes and keep their blank formatting runs paired
-    // with the preceding display node.
+    // with the preceding display node. Accepted risk: if Google ever repurposes
+    // a claimed <text> node for unrelated content instead of replacing it, the
+    // stale attributes would resurrect the old timer view there; no such node
+    // pooling has been observed.
     for (let nodeIndex = 0; nodeIndex < textNodes.length; nodeIndex++) {
       const displayNode = textNodes[nodeIndex];
       const tokenText = displayNode.getAttribute(TOKEN_ATTRIBUTE);

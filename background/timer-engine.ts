@@ -42,21 +42,34 @@ export function applyVisibleTimers(
 
     if (shouldRun && !wasRunning) {
       timer.startedAt = now;
-      // A brief render gap is treated as a seamless handoff. Restoring the
-      // stashed value also undoes reset-on-leave zeroing for that brief gap.
+      // A brief render gap is treated as a seamless handoff: the gap is credited
+      // only if the timer was actually running when it went invisible, so a
+      // paused span is never converted into elapsed time. Restoring the stashed
+      // value also undoes reset-on-leave zeroing for that brief gap. Note the
+      // grace renews on every reappearance — rapid flipping between slides keeps
+      // both budgets draining, which is deliberate: visibility is ground truth,
+      // and a presenter alternating slides is still presenting both.
       if (timer.pendingHandoff && now - timer.pendingHandoff.atMs <= HANDOFF_GRACE_MS) {
-        timer.accumulatedMs = timer.pendingHandoff.accumulatedMs + (now - timer.pendingHandoff.atMs);
+        timer.accumulatedMs = timer.pendingHandoff.accumulatedMs +
+          (timer.pendingHandoff.running ? now - timer.pendingHandoff.atMs : 0);
       }
       timer.pendingHandoff = null;
     } else if (!shouldRun && wasRunning) {
       timer.accumulatedMs += now - timer.startedAt;
       timer.startedAt = null;
       if (!isVisible) {
-        timer.pendingHandoff = { atMs: now, accumulatedMs: timer.accumulatedMs };
-        if (timer.flags?.some(f => f.type === TimerFlagType.RESET_ON_SLIDE)) {
-          timer.accumulatedMs = 0;
-        }
+        timer.pendingHandoff = { atMs: now, accumulatedMs: timer.accumulatedMs, running: true };
       }
+    }
+
+    // Reset-on-leave applies to paused timers too (parity with the old slide
+    // model). The running case stashed above already; the paused case stashes
+    // here so a brief render gap can still restore the value.
+    if (!isVisible && timer.enabled && timer.flags?.some(f => f.type === TimerFlagType.RESET_ON_SLIDE)) {
+      if (!timer.pendingHandoff) {
+        timer.pendingHandoff = { atMs: now, accumulatedMs: timer.accumulatedMs, running: false };
+      }
+      timer.accumulatedMs = 0;
     }
 
     timer.enabled = isVisible;

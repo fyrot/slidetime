@@ -23,7 +23,7 @@ describe("timer engine", () => {
 
     applyVisibleTimers(timers, visible(), 20_000);
     expect(timers.alex.accumulatedMs).toBe(20_000);
-    expect(timers.alex.pendingHandoff).toEqual({ atMs: 20_000, accumulatedMs: 20_000 });
+    expect(timers.alex.pendingHandoff).toEqual({ atMs: 20_000, accumulatedMs: 20_000, running: true });
 
     applyVisibleTimers(timers, visible("alex"), 20_300);
     expect(timers.alex.accumulatedMs).toBe(20_300);
@@ -68,7 +68,7 @@ describe("timer engine", () => {
 
     applyVisibleTimers(timers, visible(), 8_000);
     expect(timers.reset.accumulatedMs).toBe(0);
-    expect(timers.reset.pendingHandoff).toEqual({ atMs: 8_000, accumulatedMs: 8_000 });
+    expect(timers.reset.pendingHandoff).toEqual({ atMs: 8_000, accumulatedMs: 8_000, running: true });
 
     applyVisibleTimers(timers, visible("reset"), 8_300);
     expect(timers.reset.accumulatedMs).toBe(8_300);
@@ -85,6 +85,36 @@ describe("timer engine", () => {
 
     expect(timers.reset.accumulatedMs).toBe(0);
     expect(timers.reset.startedAt).toBe(8_000 + HANDOFF_GRACE_MS + 1);
+  });
+
+  it("resets a paused reset-on-slide timer when it goes invisible", () => {
+    // Regression: the reset must not depend on the timer running at departure.
+    const timers: Record<string, TimerState> = {};
+    handleRegisterTimers(timers, [countdown("reset", "A", [
+      { type: TimerFlagType.RESET_ON_SLIDE }
+    ])], visible("reset"), 0);
+
+    handleToggleVisiblePause(timers, visible("reset"), 5_000); // banked 5s, paused
+    applyVisibleTimers(timers, visible(), 6_000); // leaves the screen while paused
+
+    expect(timers.reset.accumulatedMs).toBe(0);
+    expect(timers.reset.pendingHandoff).toEqual({ atMs: 6_000, accumulatedMs: 5_000, running: false });
+  });
+
+  it("restores a paused reset value after a brief gap without crediting the gap", () => {
+    const timers: Record<string, TimerState> = {};
+    handleRegisterTimers(timers, [countdown("reset", "A", [
+      { type: TimerFlagType.RESET_ON_SLIDE }
+    ])], visible("reset"), 0);
+
+    handleToggleVisiblePause(timers, visible("reset"), 5_000);
+    applyVisibleTimers(timers, visible(), 6_000);
+    applyVisibleTimers(timers, visible("reset"), 6_500); // back, still paused
+    expect(timers.reset.accumulatedMs).toBe(0); // no activation while paused
+
+    handleToggleVisiblePause(timers, visible("reset"), 7_000); // unpause -> activation
+    expect(timers.reset.accumulatedMs).toBe(5_000); // restored, paused span NOT credited
+    expect(timers.reset.startedAt).toBe(7_000);
   });
 
   it("pauses without creating a handoff and resumes without crediting the paused span", () => {

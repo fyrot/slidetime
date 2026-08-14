@@ -28,6 +28,9 @@ interface TimerView {
 }
 
 const timerElmRecord: Record<string, TimerView[]> = {};
+// specs of everything we ever registered this session, so a port reconnect
+// with lost background state can re-register instead of stranding visible ids
+const registeredTimerSpecs: Record<string, TimerData> = {};
 const firedSet = new Set<string>();
 const soundFiredSet = new Set<string>();
 
@@ -48,6 +51,7 @@ let mutationExtractTimeout: number | null = null;
 
 // moving to content scripts acting on caches from the background store 
 let slideCheckInterval: number | null = null;
+let slideCheckStartTimeout: number | null = null;
 let stateSyncInterval: number | null = null;
 let renderLoopId: number | null = null;
 let cachedTimerStates: TimerStates | null = null;
@@ -90,6 +94,15 @@ function makePort() {
     currentSlideId = "";
     lastSentVisibleIds = null;
     port = makePort();
+    // the background may have lost its session (e.g. storage unavailable);
+    // re-register everything we know so visible ids always have state behind them
+    const specs = Object.values(registeredTimerSpecs);
+    if (specs.length > 0) {
+      port.postMessage({
+        messageType: TimerMessage.REGISTER_TIMERS,
+        timers: specs
+      } satisfies TimerMessaging);
+    }
   })
 
   // render loop now acts on cached timer states
@@ -128,12 +141,14 @@ function enterPresentMode() {
   lastSentVisibleIds = null;
 
   // slide change detection, operates on a faster interval for "responsiveness"
-  if (!slideCheckInterval) {
+  if (!slideCheckInterval && slideCheckStartTimeout == null) {
     checkSlideChange(); // run immediately on enter
-    setTimeout(() => {
+    slideCheckStartTimeout = window.setTimeout(() => {
+      slideCheckStartTimeout = null;
+      if (!inPresentMode || slideCheckInterval) { return; }
       slideCheckInterval = window.setInterval(() => {checkSlideChange();}, VISIBILITY_CHECK_INTERVAL);
     }, 500);
-    
+
   }
   // slower interval state sync to refresh cached states from background store
   // -> also serves as a heartbeat to keep the service worker alive
@@ -176,6 +191,9 @@ function exitPresentMode() {
   for (const key of Object.keys(timerElmRecord)) {
     delete timerElmRecord[key];
   }
+  for (const key of Object.keys(registeredTimerSpecs)) {
+    delete registeredTimerSpecs[key];
+  }
   // presentDocument removal now is here
   disconnectPresentDocumentObserver();
   presentDocument = null;
@@ -187,6 +205,11 @@ function exitPresentMode() {
 
 
   // clear all active intervals | slideChange, stateSync, render
+
+  if (slideCheckStartTimeout != null) {
+    clearTimeout(slideCheckStartTimeout);
+    slideCheckStartTimeout = null;
+  }
 
   if (slideCheckInterval) {
     clearInterval(slideCheckInterval);
@@ -236,6 +259,7 @@ function extractFromCurrentSlide(): boolean {
 
   for (const { view, timerData } of assignments) {
     claimView(view, timerData.id);
+    registeredTimerSpecs[timerData.id] = timerData;
 
     if (!timerElmRecord[timerData.id]) {
       timerElmRecord[timerData.id] = [];
@@ -303,6 +327,12 @@ function getTimerStates() {
 function getPresentDocument(): Document | null {
   // we gotta iterate through each iframe and get its document to access the present mode text
   for (const iframe of document.querySelectorAll("iframe")) {
+    // skip hidden/zero-size frames (e.g. presenter view helpers) so visibility
+    // checks run against the iframe the audience actually sees
+    const frameRect = iframe.getBoundingClientRect();
+    if (frameRect.width <= 0 || frameRect.height <= 0) { continue; }
+    if (iframe.checkVisibility?.() === false) { continue; }
+
     const doc = iframe.contentDocument;
     if (doc?.querySelector(PRESENT_MODE_QUERY)) {
       if (presentDocument !== doc) {
@@ -450,8 +480,12 @@ function onPauseKeydown(e: KeyboardEvent) {
   // redundant check because it will only be registered in present mode
   if (!inPresentMode) { return; }
 
-  // toggle logic is handled in background store
-  const messageContent: TimerMessaging = { messageType: TimerMessage.TOGGLE_SLIDE_PAUSE };
+  // toggle logic is handled in background store; sample visibility fresh at
+  // keypress so a mid-transition poll lag cannot pause the wrong timer
+  const messageContent: TimerMessaging = {
+    messageType: TimerMessage.TOGGLE_SLIDE_PAUSE,
+    timerIds: computeVisibleTimerIds(timerElmRecord, isViewVisible)
+  };
   port.postMessage(messageContent);
 }
 
