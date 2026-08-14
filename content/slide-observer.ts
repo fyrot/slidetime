@@ -48,6 +48,8 @@ let presentDocument: Document | null = null;
 let presentDocumentObserver: MutationObserver | null = null;
 let observedPresentDocument: Document | null = null;
 let mutationExtractTimeout: number | null = null;
+const MUTATION_EXTRACT_COOLDOWN = 100;
+let lastMutationExtractAt = 0;
 
 // moving to content scripts acting on caches from the background store 
 let slideCheckInterval: number | null = null;
@@ -329,6 +331,10 @@ function extractFromCurrentSlide(): boolean {
 
   updateVisibleTimers();
 
+  // paint newly claimed views right now from the cached states — the correct
+  // ticking state follows on the background's push a few ms later
+  renderTimerViews();
+
   return true;
 }
 
@@ -388,6 +394,14 @@ function getPresentDocument(): Document | null {
   return null;
 }
 
+function runMutationExtract() {
+  if (!inPresentMode) { return; }
+  debugLog(`GFN Timer: re-extract-on-mutation for slide ${getCurrentSlideId() || "deck"}`);
+  if (extractFromCurrentSlide()) {
+    getTimerStates();
+  }
+}
+
 function attachPresentDocumentObserver(doc: Document) {
   if (observedPresentDocument === doc || !doc.body) { return; }
 
@@ -401,17 +415,22 @@ function attachPresentDocumentObserver(doc: Document) {
     });
     if (!includesExternalMutation) { return; }
 
-    if (mutationExtractTimeout != null) {
-      clearTimeout(mutationExtractTimeout);
+    // Leading edge: extract right away when a burst begins (this is the path a
+    // freshly rendered slide takes, so it decides the switch latency), with a
+    // short cooldown so mutation storms cannot thrash extraction. The trailing
+    // pass still runs to catch nodes rendered later in the burst.
+    const now = Date.now();
+    if (now - lastMutationExtractAt >= MUTATION_EXTRACT_COOLDOWN) {
+      lastMutationExtractAt = now;
+      runMutationExtract();
     }
-    mutationExtractTimeout = window.setTimeout(() => {
-      mutationExtractTimeout = null;
-      if (!inPresentMode) { return; }
-      debugLog(`GFN Timer: re-extract-on-mutation for slide ${getCurrentSlideId() || "deck"}`);
-      if (extractFromCurrentSlide()) {
-        getTimerStates();
-      }
-    }, 150);
+    if (mutationExtractTimeout == null) {
+      mutationExtractTimeout = window.setTimeout(() => {
+        mutationExtractTimeout = null;
+        lastMutationExtractAt = Date.now();
+        runMutationExtract();
+      }, 150);
+    }
   });
   presentDocumentObserver.observe(doc.body, { childList: true, subtree: true });
   observedPresentDocument = doc;
@@ -605,13 +624,10 @@ function checkAutoAdvance(timerState: TimerState) {
   }
 }
 
-// now we can render our updates by accessing animation frames, snappy, responsive updates
-function renderLoop() {
-  if (!inPresentMode) {
-    renderLoopId = null;
-    return;
-  }
-
+// single render pass — called every animation frame, and synchronously right
+// after extraction so a freshly claimed view paints from cache immediately
+// instead of waiting for the next frame or a background round trip
+function renderTimerViews() {
   pruneTimerViews();
 
   if (cachedTimerStates) {
@@ -631,6 +647,15 @@ function renderLoop() {
       checkZeroSound(timerState);
     }
   }
+}
+
+function renderLoop() {
+  if (!inPresentMode) {
+    renderLoopId = null;
+    return;
+  }
+
+  renderTimerViews();
 
   renderLoopId = requestAnimationFrame(renderLoop);
 }

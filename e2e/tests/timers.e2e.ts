@@ -109,6 +109,23 @@ test("continuity", async ({ page }) => {
   expect(await readCountdown(secondSlide)).toBeLessThan(afterNavigation);
 });
 
+test("switch-latency", async ({ page }) => {
+  // A slide switch must repaint the timer quickly: leading-edge extraction on
+  // the first DOM mutation plus a synchronous paint from cached state. Budget
+  // is well under the ~500ms lag this guards against (mock renders instantly).
+  await enterAndShow(page, sharedDeck, 1);
+  await waitForRendered(timer(page, "alex-1"));
+  await page.waitForTimeout(2_100);
+
+  await showSlide(page, 2);
+  const startedAt = Date.now();
+  await expect.poll(async () => timer(page, "alex-2").textContent(), { timeout: 2_000 })
+    .toMatch(/^0:\d{2}/);
+  const latencyMs = Date.now() - startedAt;
+
+  expect(latencyMs, `timer repaint took ${latencyMs}ms after slide switch`).toBeLessThan(350);
+});
+
 test("independence-and-pause", async ({ page }) => {
   await enterAndShow(page, sharedDeck, 1);
   const alexSlideOne = timer(page, "alex-1");
