@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Slidetime mock presentation</title>
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+      .punch-full-screen-element {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #111;
+      }
+      iframe {
+        width: 960px;
+        height: 540px;
+        border: 0;
+        display: block;
+        background: white;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      (() => {
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        let deck = null;
+        let currentSlide = null;
+        let currentOptions = {};
+        let frame = null;
+        let frameReady = null;
+
+        function slideDefinition(number) {
+          return deck?.slides?.[number] ?? deck?.slides?.[String(number)] ?? [];
+        }
+
+        function mountTextbox(svg, textbox, textboxIndex, slideNumber, hidden) {
+          const group = document.createElementNS(SVG_NS, "g");
+          group.setAttribute("class", "sketchy-text-content-text");
+          group.setAttribute("data-mock-textbox", textbox.key);
+          group.setAttribute("data-mock-slide", String(slideNumber));
+          if (hidden) {
+            group.setAttribute("visibility", "hidden");
+            group.setAttribute("transform", "translate(2000 0)");
+          }
+
+          for (let partIndex = 0; partIndex < textbox.parts.length; partIndex++) {
+            const text = document.createElementNS(SVG_NS, "text");
+            text.setAttribute("x", String(70 + partIndex * 220));
+            text.setAttribute("y", String(100 + textboxIndex * 90));
+            text.setAttribute("font-size", "48");
+            text.textContent = textbox.parts[partIndex];
+            group.appendChild(text);
+          }
+          svg.appendChild(group);
+        }
+
+        function renderSlide(number, options) {
+          const doc = frame.contentDocument;
+          const svg = doc.querySelector("svg");
+          svg.replaceChildren();
+
+          const slideContainer = doc.createElementNS(SVG_NS, "g");
+          slideContainer.setAttribute("class", "punch-viewer-page-wrapper");
+          slideContainer.setAttribute("data-mock-slide-container", String(number));
+          svg.appendChild(slideContainer);
+
+          const addVisibleText = () => {
+            slideDefinition(number).forEach((textbox, index) => {
+              mountTextbox(slideContainer, textbox, index, number, false);
+            });
+
+            if (options.prerenderNext) {
+              slideDefinition(number + 1).forEach((textbox, index) => {
+                mountTextbox(slideContainer, textbox, index + 3, number + 1, true);
+              });
+            }
+          };
+
+          if ((options.renderDelayMs ?? 0) > 0) {
+            window.setTimeout(addVisibleText, options.renderDelayMs);
+          } else {
+            addVisibleText();
+          }
+        }
+
+        function createFrame() {
+          const fullscreen = document.querySelector(".punch-full-screen-element");
+          const replacement = document.createElement("iframe");
+          replacement.title = "Mock presentation viewport";
+          replacement.srcdoc = `<!doctype html>
+            <html><head><style>
+              html, body { width: 960px; height: 540px; margin: 0; overflow: hidden; }
+              .sketchyViewerContainer { width: 960px; height: 540px; }
+              svg { display: block; width: 960px; height: 540px; background: white; }
+              text { font-family: Arial, sans-serif; fill: black; }
+            </style></head><body>
+              <div class="sketchyViewerContainer">
+                <svg width="960" height="540" viewBox="0 0 960 540"></svg>
+              </div>
+            </body></html>`;
+
+          frameReady = new Promise((resolve) => {
+            replacement.addEventListener("load", () => resolve(), { once: true });
+          });
+          frame?.remove();
+          frame = replacement;
+          fullscreen.appendChild(frame);
+          return frameReady;
+        }
+
+        window.__mock = {
+          async enterPresent(nextDeck) {
+            deck = nextDeck;
+            currentSlide = null;
+            currentOptions = {};
+            document.querySelector(".punch-full-screen-element")?.remove();
+            const fullscreen = document.createElement("div");
+            fullscreen.className = "punch-full-screen-element";
+            document.body.appendChild(fullscreen);
+            await createFrame();
+          },
+
+          async showSlide(number, options = {}) {
+            await frameReady;
+            currentSlide = number;
+            currentOptions = {
+              renderDelayMs: options.renderDelayMs ?? 0,
+              prerenderNext: options.prerenderNext ?? false,
+              updateHash: options.updateHash ?? true
+            };
+            if (currentOptions.updateHash) {
+              location.hash = `#slide=id.p${number}`;
+            }
+            renderSlide(number, currentOptions);
+          },
+
+          async recreateDom() {
+            if (currentSlide == null) return;
+            await createFrame();
+            renderSlide(currentSlide, currentOptions);
+          },
+
+          exitPresent() {
+            document.querySelector(".punch-full-screen-element")?.remove();
+            frame = null;
+            frameReady = null;
+            currentSlide = null;
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
