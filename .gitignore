@@ -34,3 +34,7 @@ dist/
 
 # used for plasmo build actions, keep secret!!
 keys.json 
+
+# playwright
+test-results/
+playwright-report/
