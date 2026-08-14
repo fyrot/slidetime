@@ -148,5 +148,10 @@ function handleGetTimerStates(session: SlidesSession) {
   const retrieved: TimerStates = {
     timers: Object.values(session.timerStateRecord)
   };
-  session.port.postMessage(retrieved);
+  try {
+    session.port.postMessage(retrieved);
+  } catch {
+    // the tab closed or navigated with a push in flight; onDisconnect will
+    // clean the session up — nothing to do here
+  }
 }
