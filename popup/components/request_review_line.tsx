@@ -1,6 +1,6 @@
 import { LucideMoveUpRight } from "lucide-react";
 import { useTheme } from "~popup/theme_context";
-
+import { useEffect, useState } from "react";
 
 const GENERAL_MESSAGE = "Enjoying Slidetime?"
 const REVIEW_MESSAGE = "Share your thoughts here"
@@ -29,15 +29,25 @@ const FALLBACK_REVIEW_URL = REVIEW_PAGE_URLS.chrome as string
 function RequestReviewLine() {
   const theme = useTheme();
   const reviewPageUrl = REVIEW_PAGE_URLS[detectBrowser()] ?? FALLBACK_REVIEW_URL
+  const [versionString, updateVersionString] = useState<string>("");
 
+  useEffect(() => {
+    updateVersionString(chrome.runtime.getManifest().version);
+  }, [])
   return (
     <div 
       className="flex flex-row items-start text-[0.55rem] pointer-events-none"
       style={{color: theme.theme.text.primary}}
     >
-      <p className="opacity-50">
-        {GENERAL_MESSAGE}
-      </p>
+      <div className="flex flex-col opacity-50">
+        <p>
+          {GENERAL_MESSAGE}
+        </p>
+        <p>
+          {versionString}
+        </p>
+        
+      </div>
       <div className="grow" />
       <div className="flex flex-col">
         { /* review redirect */ }
