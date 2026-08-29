@@ -13,8 +13,8 @@ debugLog("GFN Timer: content script injected");
 const SLIDE_CHANGED_INTERVAL = 100; // 0.1s
 const STATE_SYNC_INTERVAL = 5000;
 
-const INITIAL_RETRIES = 10;
-let extractRetries = 0;
+
+let currentSlideExtracted = false;
 
 // for selecting text nodes from rendered slide
 
@@ -77,6 +77,7 @@ function makePort() {
   // auto reconnect
   newPort.onDisconnect.addListener(() => {
     currentSlideId = "";
+    currentSlideExtracted = false;
     port = makePort();
   })
 
@@ -112,7 +113,9 @@ function enterPresentMode() {
   debugLog("GFN Timer: enterPresentMode");
   inPresentMode = true;
   currentSlideId = "";
-  extractRetries = 0;
+  currentSlideExtracted = false;
+
+
 
   // slide change detection, operates on a faster interval for "responsiveness"
   if (!slideCheckInterval) {
@@ -147,6 +150,7 @@ function enterPresentMode() {
 function exitPresentMode() {
   inPresentMode = false;
   currentSlideId = "";
+  currentSlideExtracted = false;
 
   // always detach the keybind on exit, regardless of setting, presence will be handled in detach function
   detachPauseListener();
@@ -207,6 +211,13 @@ function extractFromCurrentSlide(): boolean {
   }
 
   const allTextNodes = doc.querySelectorAll<SVGTextElement>(TEXT_NODE_QUERY);
+  if (allTextNodes.length === 0) {
+    // waiting for text to be loaded in, possible to loop if the slide has nothing
+    // but that's pretty inexpensive
+    debugLog("GFN Timer: extract -> no text nodes yet");
+    return false;
+  }
+
   const foundTimers: TimerData[] = [];
   let tokenInd = 0;
 
@@ -243,21 +254,6 @@ function extractFromCurrentSlide(): boolean {
 }
 
 
-function onSlideChanged(): boolean {
-  // we'll go with polling for this; in case google engineers change how the dom renders slides
-  //  this is a more robust, stable method that will likely require less dev intervention
-  const slideId = getCurrentSlideId();
-  const extracted = extractFromCurrentSlide();
-  const messageContent:TimerMessaging = {
-    messageType: TimerMessage.SLIDE_CHANGED,
-    slideId: slideId
-  };
-
-  port.postMessage(messageContent);
-
-  return extracted;
-}
-
 function getTimerStates() {
   // more like a ping and response
   const messageContent: TimerMessaging = {
@@ -291,13 +287,13 @@ function isInPresentMode(): boolean {
 }
 
 
-// check for slide change, called every sec approximately
+// check for slide change, called every ~100ms
 function checkSlideChange() {
   if (!inPresentMode) return;
 
   const id = getCurrentSlideId();
+
   if (id !== currentSlideId) {
-    //debugLog("GFN Timer: slide changed from", currentSlideId, "to", id);
     const doc = getPresentDocument();
     if (!doc) { return; }
 
@@ -306,19 +302,22 @@ function checkSlideChange() {
       attachPauseListener();
     }
 
-    debugLog("trying..")
-    if (onSlideChanged()) {
-      debugLog("onslidechanged hit");
-      currentSlideId = id;
-      extractRetries = 0;
-      getTimerStates();
-    } else if (extractRetries++ > INITIAL_RETRIES) {
-      debugLog("extract retry limit hit");
-      currentSlideId = id;
-      extractRetries = 0;
+    debugLog("GFN Timer: slide changed from " + currentSlideId + " to " + id);
+    currentSlideId = id;
+    currentSlideExtracted = false;
+
+    const messageContent: TimerMessaging = {
+      messageType: TimerMessage.SLIDE_CHANGED,
+      slideId: id
+    };
+    port.postMessage(messageContent);
+  }
+
+  if (!currentSlideExtracted) {
+    currentSlideExtracted = extractFromCurrentSlide();
+    if (currentSlideExtracted) {
       getTimerStates();
     }
-    
   }
 }
 

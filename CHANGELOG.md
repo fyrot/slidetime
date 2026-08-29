@@ -1,5 +1,11 @@
 # Changelog 
 
+## 1.3.3
+
+### Fixed
+- Resolved bug where slower networks would miss the first registration of timers on the first-loaded slide
+- Improved slide responsiveness by checking for both slide changes and content changes periodically  
+
 ## 1.3.2
 
 ### Added
