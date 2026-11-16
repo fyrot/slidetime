@@ -32,4 +32,13 @@ Alternatively, you can `git clone` this repository and run `npm run build` in th
 
 We’re always looking forward to including new features to make the extension more helpful! Any feedback is appreciated and goes a long way in figuring out how to improve the Slidetime experience. 
 
-Feel free to leave a review on our Chrome Web Store listing or open up a feature request over here. 
+*Feel free to leave a review on the Chrome Web Store (or open up a feature request over here)!* 
+
+## Gallery
+
+These images on our listing likely do a better job of explaining what the extension does!
+
+<img width="960" height="600" alt="image" src="https://github.com/user-attachments/assets/5593d9e6-43ef-487b-a100-0e774d60996d" />
+<img width="960" height="600" alt="image" src="https://github.com/user-attachments/assets/3f0d9e8e-1653-4bbb-8f38-77852b3226e7" />
+<img width="960" height="600" alt="image" src="https://github.com/user-attachments/assets/8c038ed1-f0a9-46ae-bc90-29799236a6dc" />
+<img width="960" height="600" alt="image" src="https://github.com/user-attachments/assets/6e65a36d-12a9-47fc-b29d-08f17abf7dd4" />
